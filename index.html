@@ -165,6 +165,15 @@
       padding: 20px;
       color: #aaa;
     }
+    .url-display {
+      background: #2a2a2a;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      word-break: break-all;
+      color: #4ade80;
+    }
   </style>
 </head>
 <body>
@@ -181,7 +190,9 @@
         <h2>📥 Add from Link</h2>
         <p style="color:#aaa;font-size:0.9rem;margin-bottom:16px;">Classify this product before saving to your private database.</p>
 
-        <div id="loadingPreview" class="loading">Loading product preview...</div>
+        <div id="urlDisplay" class="url-display"></div>
+
+        <div id="loadingPreview" class="loading hidden">Loading product preview...</div>
 
         <div id="previewBox" class="preview-box hidden">
           <div id="previewImage" class="hidden" style="text-align:center;"></div>
@@ -376,7 +387,7 @@
       box.textContent = msg;
       box.classList.remove("hidden");
       console.error("Error:", msg);
-      setTimeout(() => box.classList.add("hidden"), 8000);
+      setTimeout(() => box.classList.add("hidden"), 10000);
     }
 
     function showSuccess(msg) {
@@ -396,7 +407,7 @@
 
     // Fetch product metadata from Edge Function
     async function fetchProductMeta(url) {
-      console.log("Fetching metadata for:", url);
+      console.log("🔍 Fetching metadata for:", url);
       try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/fetch-product-meta`, {
           method: "POST",
@@ -406,16 +417,16 @@
           body: JSON.stringify({ url }),
         });
 
-        console.log("Response status:", response.status);
+        console.log("📡 Response status:", response.status);
         const data = await response.json();
-        console.log("Response data:", data);
+        console.log("📦 Response data:", data);
 
         if (!response.ok) {
           throw new Error(data.error || `HTTP ${response.status}`);
         }
         return data;
       } catch (err) {
-        console.error("Fetch meta error:", err);
+        console.error("❌ Fetch meta error:", err);
         return null;
       }
     }
@@ -423,6 +434,7 @@
     // Save to Supabase
     async function saveToSupabase(table, data) {
       try {
+        console.log("💾 Saving to", table, data);
         const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
           method: "POST",
           headers: {
@@ -433,13 +445,14 @@
           body: JSON.stringify(data),
         });
 
+        console.log("💾 Save response:", response.status);
         if (!response.ok) {
           const err = await response.json();
           throw new Error(err.message || "Save failed");
         }
         return await response.json();
       } catch (err) {
-        console.error("Save error:", err);
+        console.error("❌ Save error:", err);
         throw err;
       }
     }
@@ -469,28 +482,36 @@
       const params = new URLSearchParams(window.location.search);
       const url = params.get("url");
 
-      console.log("URL param:", url);
+      console.log("📍 URL param:", url);
+      console.log("📍 Full search:", window.location.search);
 
       if (!url) {
+        console.log("✅ No URL param, showing main app");
         document.getElementById("mainApp").classList.remove("hidden");
         loadGearItems();
         loadShoppingItems();
         return;
       }
 
+      console.log("🚀 Starting import flow");
       importedUrl = url;
       document.getElementById("importFlow").classList.remove("hidden");
       document.getElementById("mainApp").classList.add("hidden");
+      document.getElementById("urlDisplay").textContent = "Importing: " + url;
 
-      // Fetch metadata
-      const meta = await fetchProductMeta(url);
+      // Show manual entry immediately as fallback
+      document.getElementById("manualEntry").classList.remove("hidden");
       document.getElementById("loadingPreview").classList.add("hidden");
 
-      console.log("Metadata result:", meta);
+      // Fetch metadata in background
+      console.log("🔄 Fetching metadata...");
+      const meta = await fetchProductMeta(url);
+      console.log("📬 Metadata result:", meta);
 
       if (meta) {
         importedMeta = meta;
         document.getElementById("previewBox").classList.remove("hidden");
+        document.getElementById("manualEntry").classList.add("hidden");
         document.getElementById("previewTitle").textContent = meta.title;
         document.getElementById("previewUrl").textContent = meta.url;
         document.getElementById("previewUrl").href = meta.url;
@@ -504,8 +525,7 @@
           document.getElementById("previewImage").classList.remove("hidden");
         }
       } else {
-        console.log("Showing manual entry");
-        document.getElementById("manualEntry").classList.remove("hidden");
+        console.log("⚠️ No metadata, keeping manual entry");
       }
 
       // Classification buttons
@@ -560,7 +580,6 @@
 
       try {
         if (selectedClassification === "owned") {
-          // Save to gear_items
           const gearData = {
             ...commonData,
             name: title,
@@ -571,7 +590,6 @@
           await saveToSupabase("gear_items", gearData);
           showSuccess("✅ Gear item saved!");
         } else {
-          // Save to shopping_items
           const status = selectedClassification === "shopping" ? "wishlist" : "researching";
           const shopData = {
             ...commonData,
@@ -587,7 +605,6 @@
           showSuccess(selectedClassification === "shopping" ? "✅ Shopping item saved!" : "✅ Researching item saved!");
         }
 
-        // Redirect to main app after short delay
         setTimeout(() => {
           window.history.pushState({}, "", window.location.pathname);
           location.reload();
@@ -655,7 +672,6 @@
         });
       });
 
-      // Save gear button
       document.getElementById("saveGearBtn").addEventListener("click", async () => {
         const name = document.getElementById("gearName").value.trim();
         if (!name) {
@@ -680,7 +696,6 @@
         }
       });
 
-      // Save shopping button
       document.getElementById("saveShopBtn").addEventListener("click", async () => {
         const name = document.getElementById("shopName").value.trim();
         if (!name) {
