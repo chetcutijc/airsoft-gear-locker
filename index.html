@@ -375,7 +375,8 @@
       const box = document.getElementById("errorBox");
       box.textContent = msg;
       box.classList.remove("hidden");
-      setTimeout(() => box.classList.add("hidden"), 5000);
+      console.error("Error:", msg);
+      setTimeout(() => box.classList.add("hidden"), 8000);
     }
 
     function showSuccess(msg) {
@@ -395,19 +396,22 @@
 
     // Fetch product metadata from Edge Function
     async function fetchProductMeta(url) {
+      console.log("Fetching metadata for:", url);
       try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/fetch-product-meta`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({ url }),
         });
 
+        console.log("Response status:", response.status);
         const data = await response.json();
+        console.log("Response data:", data);
+
         if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch metadata");
+          throw new Error(data.error || `HTTP ${response.status}`);
         }
         return data;
       } catch (err) {
@@ -465,6 +469,8 @@
       const params = new URLSearchParams(window.location.search);
       const url = params.get("url");
 
+      console.log("URL param:", url);
+
       if (!url) {
         document.getElementById("mainApp").classList.remove("hidden");
         loadGearItems();
@@ -474,10 +480,13 @@
 
       importedUrl = url;
       document.getElementById("importFlow").classList.remove("hidden");
+      document.getElementById("mainApp").classList.add("hidden");
 
       // Fetch metadata
       const meta = await fetchProductMeta(url);
       document.getElementById("loadingPreview").classList.add("hidden");
+
+      console.log("Metadata result:", meta);
 
       if (meta) {
         importedMeta = meta;
@@ -487,12 +496,15 @@
         document.getElementById("previewUrl").href = meta.url;
         if (meta.price) {
           document.getElementById("previewPrice").textContent = `€${meta.price.toFixed(2)}`;
+        } else {
+          document.getElementById("previewPrice").textContent = "Not found";
         }
         if (meta.image) {
           document.getElementById("previewImage").innerHTML = `<img src="${meta.image}" alt="Product image" />`;
           document.getElementById("previewImage").classList.remove("hidden");
         }
       } else {
+        console.log("Showing manual entry");
         document.getElementById("manualEntry").classList.remove("hidden");
       }
 
