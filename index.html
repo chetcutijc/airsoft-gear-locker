@@ -1,1 +1,706 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gear Locker</title><style>body{font-family:system-ui;margin:0;background:#f5f3ed;color:#24251f}.wrap{max-width:900px;margin:auto;padding:20px}.card{background:#fff;border:1px solid #d4cfc2;border-radius:14px;padding:16px;margin:14px 0}input,select,textarea,button{font:inherit;padding:9px;margin:4px 0;max-width:100%;box-sizing:border-box}input,select,textarea{width:100%}button{background:#56632f;color:#fff;border:0;border-radius:8px}.hidden{display:none}.grid{display:grid;gap:10px}@media(min-width:600px){.grid{grid-template-columns:1fr 1fr}}.item{border-top:1px solid #ddd;padding:10px 0}.muted{color:#666}</style></head><body><main class="wrap"><h1>Gear Locker</h1><p>Private cross-device gear and shopping tracker.</p><section class="card" id="auth"><h2>Sign in</h2><input id="email" type="email" placeholder="you@example.com"><button id="login">Email me a sign-in link</button><p id="authmsg" class="muted"></p></section><section id="app" class="hidden"><div class="card"><button id="logout">Sign out</button><p id="who"></p><div class="grid"><div><h2 id="gearCount">0 gear items</h2><p id="attention" class="muted"></p></div><div><h2 id="shopCount">0 open purchases</h2><p id="high" class="muted"></p></div></div></div><section class="card"><h2>Add gear</h2><form id="gearForm"><div class="grid"><input name="name" required placeholder="Item name, e.g. SSP5"><select name="category"><option value="replica">Replica</option><option value="magazine">Magazine</option><option value="holster">Holster</option><option value="eye_protection">Eye protection</option><option value="face_protection">Face protection</option><option value="gas">Gas</option><option value="bbs">BBs</option><option value="accessory">Accessory</option><option value="other">Other</option></select><select name="status"><option value="active">Active</option><option value="needs_attention">Needs attention</option><option value="retired">Retired</option></select><input name="brand" placeholder="Brand (optional)"></div><textarea name="notes" placeholder="Notes (optional)"></textarea><button>Add gear</button></form><div id="gearList"></div></section><section class="card"><h2>Shopping list</h2><form id="shopForm"><div class="grid"><input name="name" required placeholder="Item to buy"><select name="priority"><option value="low">Low priority</option><option value="medium" selected>Medium priority</option><option value="high">High priority</option></select><input name="estimated_cost" inputmode="decimal" type="number" min="0" step="0.01" placeholder="Estimated cost (optional)"></div><textarea name="reason" placeholder="Why do you need it? (optional)"></textarea><button>Add to shopping list</button></form><div id="shopList"></div></section><section class="card"><h2>Storage checklist</h2><p>Keep the replica unloaded and secured; store gas upright, cool, and separate from the case; protect eye and face gear from crushing and heat.</p></section></section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>const sb=supabase.createClient('https://jcheoqzbkfavjwuyesku.supabase.co','sb_publishable_5xj3YyY41_49kcQ6OQR4dg_lbf1ryRl');const $=x=>document.querySelector(x);function esc(s){return String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]))}async function load(){let{data:{user}}=await sb.auth.getUser();$('#auth').classList.toggle('hidden',!!user);$('#app').classList.toggle('hidden',!user);if(!user)return;$('#who').textContent='Signed in as '+user.email;let[{data:g,error:ge},{data:s,error:se}]=await Promise.all([sb.from('gear_items').select('*').order('created_at',{ascending:false}),sb.from('shopping_items').select('*').order('created_at',{ascending:false})]);if(ge||se)alert((ge||se).message);g=g||[];s=s||[];$('#gearCount').textContent=g.length+' gear item'+(g.length===1?'':'s');$('#attention').textContent=g.filter(x=>x.status==='needs_attention').length+' need attention';$('#shopCount').textContent=s.filter(x=>!x.purchased).length+' open purchase'+(s.filter(x=>!x.purchased).length===1?'':'s');$('#high').textContent=s.filter(x=>!x.purchased&&x.priority==='high').length+' high priority';$('#gearList').innerHTML=g.map(x=>`<div class=item><b>${esc(x.name)}</b> · ${esc(x.category)} · ${esc(x.status)}<br><span class=muted>${esc(x.brand||'')}${x.notes?' — '+esc(x.notes):''}</span><br><button data-del-gear="${x.id}">Delete</button></div>`).join('')||'<p class=muted>No gear added yet.</p>';$('#shopList').innerHTML=s.map(x=>`<div class=item><label><input type=checkbox data-buy="${x.id}" ${x.purchased?'checked':''}> <b>${esc(x.name)}</b></label> · ${esc(x.priority)}${x.estimated_cost!=null?' · '+esc(x.estimated_cost):''}<br><span class=muted>${esc(x.reason||'')}</span><br><button data-del-shop="${x.id}">Delete</button></div>`).join('')||'<p class=muted>No shopping items yet.</p>'}$('#login').onclick=async()=>{let email=$('#email').value.trim();if(!email)return;let{error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:'https://chetcutijc.github.io/airsoft-gear-locker/'}});$('#authmsg').textContent=error?error.message:'Check your email for the sign-in link.'};$('#logout').onclick=async()=>{await sb.auth.signOut();load()};$('#gearForm').onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),o=Object.fromEntries(f);let{error}=await sb.from('gear_items').insert(o);if(error)alert(error.message);else{e.target.reset();load()}};$('#shopForm').onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),o=Object.fromEntries(f);o.estimated_cost=o.estimated_cost===''?null:Number(o.estimated_cost);let{error}=await sb.from('shopping_items').insert(o);if(error)alert(error.message);else{e.target.reset();load()}};document.addEventListener('click',async e=>{let id=e.target.dataset.delGear||e.target.dataset.delShop;if(id){let t=e.target.dataset.delGear?'gear_items':'shopping_items';if(confirm('Delete this item?')){let{error}=await sb.from(t).delete().eq('id',id);if(error)alert(error.message);load()}}});document.addEventListener('change',async e=>{let id=e.target.dataset.buy;if(id){let{error}=await sb.from('shopping_items').update({purchased:e.target.checked,purchased_on:e.target.checked?new Date().toISOString().slice(0,10):null}).eq('id',id);if(error)alert(error.message);load()}});sb.auth.onAuthStateChange(()=>setTimeout(load,0));load();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Gear Locker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      margin: 0;
+      padding: 0;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    h1, h2 {
+      color: #4ade80;
+      margin-bottom: 8px;
+    }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 24px; }
+    .card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 1rem;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #4ade80;
+    }
+    button {
+      background: #4ade80;
+      color: #0a0a0a;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #3a3a3a;
+      color: #e0e0e0;
+    }
+    .hidden { display: none; }
+    .error {
+      background: #ef4444;
+      color: #fff;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .success {
+      background: #22c55e;
+      color: #fff;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .nav-tab {
+      flex: 1;
+      padding: 10px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      text-align: center;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .nav-tab.active {
+      background: #4ade80;
+      color: #0a0a0a;
+      border-color: #4ade80;
+    }
+    .item-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .item-list li {
+      background: #2a2a2a;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .item-list .item-name {
+      font-weight: 600;
+      color: #4ade80;
+    }
+    .item-list .item-meta {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-top: 4px;
+    }
+    .preview-box {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .preview-box img {
+      max-width: 100%;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+    .classification-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .classification-btn {
+      flex: 1;
+      padding: 12px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      text-align: center;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .classification-btn.selected {
+      background: #4ade80;
+      color: #0a0a0a;
+      border-color: #4ade80;
+    }
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔒 Gear Locker</h1>
+    <p style="color:#aaa;font-size:0.9rem;">Airsoft home storage and organization guide with a persistent checklist.</p>
+
+    <div id="errorBox" class="error hidden"></div>
+    <div id="successBox" class="success hidden"></div>
+
+    <!-- Import Flow (shown when ?url= is present) -->
+    <div id="importFlow" class="hidden">
+      <div class="card">
+        <h2>📥 Add from Link</h2>
+        <p style="color:#aaa;font-size:0.9rem;margin-bottom:16px;">Classify this product before saving to your private database.</p>
+
+        <div id="loadingPreview" class="loading">Loading product preview...</div>
+
+        <div id="previewBox" class="preview-box hidden">
+          <div id="previewImage" class="hidden" style="text-align:center;"></div>
+          <p><strong>Title:</strong> <span id="previewTitle"></span></p>
+          <p><strong>URL:</strong> <a id="previewUrl" href="#" target="_blank" rel="noopener" style="color:#4ade80;"></a></p>
+          <p><strong>Price:</strong> <span id="previewPrice">Not found</span></p>
+        </div>
+
+        <div id="manualEntry" class="hidden">
+          <p style="color:#ef4444;">Could not load product preview. Please enter details manually:</p>
+          <div class="form-group">
+            <label for="manualTitle">Title *</label>
+            <input type="text" id="manualTitle" placeholder="Product name" />
+          </div>
+          <div class="form-group">
+            <label for="manualPrice">Price (optional)</label>
+            <input type="number" id="manualPrice" step="0.01" placeholder="0.00" />
+          </div>
+        </div>
+
+        <p style="margin:16px 0 8px;"><strong>Classification *</strong></p>
+        <div class="classification-group">
+          <div class="classification-btn" data-class="owned">Owned</div>
+          <div class="classification-btn" data-class="shopping">Shopping</div>
+          <div class="classification-btn" data-class="researching">Researching</div>
+        </div>
+
+        <div class="form-group">
+          <label for="importCategory">Category</label>
+          <select id="importCategory">
+            <option value="replica">Replica</option>
+            <option value="magazine">Magazine</option>
+            <option value="holster">Holster</option>
+            <option value="eye_protection">Eye Protection</option>
+            <option value="face_protection">Face Protection</option>
+            <option value="gas">Gas</option>
+            <option value="bbs">BBs</option>
+            <option value="accessory">Accessory</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="importBrand">Brand (optional)</label>
+          <input type="text" id="importBrand" placeholder="Brand name" />
+        </div>
+
+        <div class="form-group">
+          <label for="importNotes">Notes (optional)</label>
+          <textarea id="importNotes" rows="3" placeholder="Additional details..."></textarea>
+        </div>
+
+        <button id="saveImportBtn" disabled>Save to Gear Locker</button>
+        <button class="btn-secondary" id="cancelImportBtn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Main App (shown when no ?url=) -->
+    <div id="mainApp" class="hidden">
+      <div class="nav-tabs">
+        <div class="nav-tab active" data-tab="gear">Gear</div>
+        <div class="nav-tab" data-tab="shopping">Shopping</div>
+        <div class="nav-tab" data-tab="sessions">Sessions</div>
+        <div class="nav-tab" data-tab="events">Events</div>
+      </div>
+
+      <!-- Gear Tab -->
+      <div id="gearTab">
+        <h2>➕ Add Gear Item</h2>
+        <div class="card">
+          <div class="form-group">
+            <label for="gearName">Name *</label>
+            <input type="text" id="gearName" placeholder="Item name" />
+          </div>
+          <div class="form-group">
+            <label for="gearCategory">Category</label>
+            <select id="gearCategory">
+              <option value="replica">Replica</option>
+              <option value="magazine">Magazine</option>
+              <option value="holster">Holster</option>
+              <option value="eye_protection">Eye Protection</option>
+              <option value="face_protection">Face Protection</option>
+              <option value="gas">Gas</option>
+              <option value="bbs">BBs</option>
+              <option value="accessory">Accessory</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="gearBrand">Brand (optional)</label>
+            <input type="text" id="gearBrand" placeholder="Brand name" />
+          </div>
+          <div class="form-group">
+            <label for="gearNotes">Notes (optional)</label>
+            <textarea id="gearNotes" rows="3" placeholder="Additional details..."></textarea>
+          </div>
+          <button id="saveGearBtn">Save Gear Item</button>
+        </div>
+
+        <h2>📦 Your Gear</h2>
+        <div class="card">
+          <ul id="gearList" class="item-list">
+            <li style="color:#aaa;">Loading...</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Shopping Tab -->
+      <div id="shoppingTab" class="hidden">
+        <h2>➕ Add Shopping Item</h2>
+        <div class="card">
+          <div class="form-group">
+            <label for="shopName">Name *</label>
+            <input type="text" id="shopName" placeholder="Item name" />
+          </div>
+          <div class="form-group">
+            <label for="shopCategory">Category</label>
+            <select id="shopCategory">
+              <option value="replica">Replica</option>
+              <option value="magazine">Magazine</option>
+              <option value="holster">Holster</option>
+              <option value="eye_protection">Eye Protection</option>
+              <option value="face_protection">Face Protection</option>
+              <option value="gas">Gas</option>
+              <option value="bbs">BBs</option>
+              <option value="accessory">Accessory</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="shopPriority">Priority</label>
+            <select id="shopPriority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="shopEstCost">Estimated Cost (optional)</label>
+            <input type="number" id="shopEstCost" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="form-group">
+            <label for="shopReason">Reason (optional)</label>
+            <textarea id="shopReason" rows="2" placeholder="Why do you want this?"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="shopUrl">URL (optional)</label>
+            <input type="url" id="shopUrl" placeholder="https://..." />
+          </div>
+          <button id="saveShopBtn">Save Shopping Item</button>
+        </div>
+
+        <h2>🛒 Shopping List</h2>
+        <div class="card">
+          <ul id="shoppingList" class="item-list">
+            <li style="color:#aaa;">Loading...</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Sessions Tab -->
+      <div id="sessionsTab" class="hidden">
+        <h2>📅 Practice Sessions</h2>
+        <div class="card">
+          <p style="color:#aaa;">Session tracking coming soon.</p>
+        </div>
+      </div>
+
+      <!-- Events Tab -->
+      <div id="eventsTab" class="hidden">
+        <h2>🎯 Events</h2>
+        <div class="card">
+          <p style="color:#aaa;">Event tracking coming soon.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase configuration
+    const SUPABASE_URL = "https://jcheoqzbkfavjwuyesku.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjaGVvcXpia2Zhdmp3dXllc2t1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMTcxMzMsImV4cCI6MjEwMzY5MzEzM30.i6Ezt82JNQelXMh06n7GXgVa4esPTqd8AMlj2mTVuyM";
+
+    // State
+    let selectedClassification = null;
+    let importedUrl = "";
+    let importedMeta = null;
+
+    // Utility functions
+    function showError(msg) {
+      const box = document.getElementById("errorBox");
+      box.textContent = msg;
+      box.classList.remove("hidden");
+      setTimeout(() => box.classList.add("hidden"), 5000);
+    }
+
+    function showSuccess(msg) {
+      const box = document.getElementById("successBox");
+      box.textContent = msg;
+      box.classList.remove("hidden");
+      setTimeout(() => box.classList.add("hidden"), 5000);
+    }
+
+    function hideAllTabs() {
+      document.getElementById("gearTab").classList.add("hidden");
+      document.getElementById("shoppingTab").classList.add("hidden");
+      document.getElementById("sessionsTab").classList.add("hidden");
+      document.getElementById("eventsTab").classList.add("hidden");
+      document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+    }
+
+    // Fetch product metadata from Edge Function
+    async function fetchProductMeta(url) {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/fetch-product-meta`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ url }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch metadata");
+        }
+        return data;
+      } catch (err) {
+        console.error("Fetch meta error:", err);
+        return null;
+      }
+    }
+
+    // Save to Supabase
+    async function saveToSupabase(table, data) {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || "Save failed");
+        }
+        return await response.json();
+      } catch (err) {
+        console.error("Save error:", err);
+        throw err;
+      }
+    }
+
+    // Load items from Supabase
+    async function loadItems(table) {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.desc&limit=50`, {
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load items");
+        }
+        return await response.json();
+      } catch (err) {
+        console.error("Load error:", err);
+        return [];
+      }
+    }
+
+    // Initialize import flow
+    async function initImportFlow() {
+      const params = new URLSearchParams(window.location.search);
+      const url = params.get("url");
+
+      if (!url) {
+        document.getElementById("mainApp").classList.remove("hidden");
+        loadGearItems();
+        loadShoppingItems();
+        return;
+      }
+
+      importedUrl = url;
+      document.getElementById("importFlow").classList.remove("hidden");
+
+      // Fetch metadata
+      const meta = await fetchProductMeta(url);
+      document.getElementById("loadingPreview").classList.add("hidden");
+
+      if (meta) {
+        importedMeta = meta;
+        document.getElementById("previewBox").classList.remove("hidden");
+        document.getElementById("previewTitle").textContent = meta.title;
+        document.getElementById("previewUrl").textContent = meta.url;
+        document.getElementById("previewUrl").href = meta.url;
+        if (meta.price) {
+          document.getElementById("previewPrice").textContent = `€${meta.price.toFixed(2)}`;
+        }
+        if (meta.image) {
+          document.getElementById("previewImage").innerHTML = `<img src="${meta.image}" alt="Product image" />`;
+          document.getElementById("previewImage").classList.remove("hidden");
+        }
+      } else {
+        document.getElementById("manualEntry").classList.remove("hidden");
+      }
+
+      // Classification buttons
+      document.querySelectorAll(".classification-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".classification-btn").forEach(b => b.classList.remove("selected"));
+          btn.classList.add("selected");
+          selectedClassification = btn.dataset.class;
+          document.getElementById("saveImportBtn").disabled = false;
+        });
+      });
+
+      // Save button
+      document.getElementById("saveImportBtn").addEventListener("click", saveImport);
+      document.getElementById("cancelImportBtn").addEventListener("click", () => {
+        window.history.pushState({}, "", window.location.pathname);
+        location.reload();
+      });
+    }
+
+    // Save imported item
+    async function saveImport() {
+      if (!selectedClassification) {
+        showError("Please select a classification.");
+        return;
+      }
+
+      const category = document.getElementById("importCategory").value;
+      const brand = document.getElementById("importBrand").value.trim();
+      const notes = document.getElementById("importNotes").value.trim();
+
+      let title = importedMeta ? importedMeta.title : document.getElementById("manualTitle").value.trim();
+      let price = importedMeta ? importedMeta.price : null;
+      if (!price) {
+        const manualPrice = document.getElementById("manualPrice").value;
+        price = manualPrice ? parseFloat(manualPrice) : null;
+      }
+
+      if (!title) {
+        showError("Please enter a title.");
+        return;
+      }
+
+      const commonData = {
+        source_url: importedUrl,
+        source_title: title,
+        source_image_url: importedMeta?.image || null,
+        price,
+        import_status: "imported",
+        last_checked_at: new Date().toISOString(),
+      };
+
+      try {
+        if (selectedClassification === "owned") {
+          // Save to gear_items
+          const gearData = {
+            ...commonData,
+            name: title,
+            category,
+            brand: brand || null,
+            notes: notes || null,
+          };
+          await saveToSupabase("gear_items", gearData);
+          showSuccess("✅ Gear item saved!");
+        } else {
+          // Save to shopping_items
+          const status = selectedClassification === "shopping" ? "wishlist" : "researching";
+          const shopData = {
+            ...commonData,
+            name: title,
+            category,
+            status,
+            priority: "medium",
+            estimated_cost: price,
+            url: importedUrl,
+            notes: notes || null,
+          };
+          await saveToSupabase("shopping_items", shopData);
+          showSuccess(selectedClassification === "shopping" ? "✅ Shopping item saved!" : "✅ Researching item saved!");
+        }
+
+        // Redirect to main app after short delay
+        setTimeout(() => {
+          window.history.pushState({}, "", window.location.pathname);
+          location.reload();
+        }, 1500);
+      } catch (err) {
+        showError("Failed to save: " + err.message);
+      }
+    }
+
+    // Load gear items
+    async function loadGearItems() {
+      const items = await loadItems("gear_items");
+      const list = document.getElementById("gearList");
+      if (items.length === 0) {
+        list.innerHTML = '<li style="color:#aaa;">No gear items yet.</li>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+        <li>
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-meta">
+            ${item.category}${item.brand ? " • " + escapeHtml(item.brand) : ""}
+            ${item.price ? " • €" + item.price.toFixed(2) : ""}
+          </div>
+        </li>
+      `).join("");
+    }
+
+    // Load shopping items
+    async function loadShoppingItems() {
+      const items = await loadItems("shopping_items");
+      const list = document.getElementById("shoppingList");
+      if (items.length === 0) {
+        list.innerHTML = '<li style="color:#aaa;">No shopping items yet.</li>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+        <li>
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-meta">
+            ${item.category} • ${item.status}${item.estimated_cost ? " • €" + item.estimated_cost.toFixed(2) : ""}
+          </div>
+        </li>
+      `).join("");
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Initialize main app tabs
+    function initMainApp() {
+      document.querySelectorAll(".nav-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          hideAllTabs();
+          tab.classList.add("active");
+          const tabName = tab.dataset.tab;
+          if (tabName === "gear") document.getElementById("gearTab").classList.remove("hidden");
+          if (tabName === "shopping") document.getElementById("shoppingTab").classList.remove("hidden");
+          if (tabName === "sessions") document.getElementById("sessionsTab").classList.remove("hidden");
+          if (tabName === "events") document.getElementById("eventsTab").classList.remove("hidden");
+        });
+      });
+
+      // Save gear button
+      document.getElementById("saveGearBtn").addEventListener("click", async () => {
+        const name = document.getElementById("gearName").value.trim();
+        if (!name) {
+          showError("Please enter a name.");
+          return;
+        }
+        const gearData = {
+          name,
+          category: document.getElementById("gearCategory").value,
+          brand: document.getElementById("gearBrand").value.trim() || null,
+          notes: document.getElementById("gearNotes").value.trim() || null,
+        };
+        try {
+          await saveToSupabase("gear_items", gearData);
+          showSuccess("✅ Gear item saved!");
+          document.getElementById("gearName").value = "";
+          document.getElementById("gearBrand").value = "";
+          document.getElementById("gearNotes").value = "";
+          loadGearItems();
+        } catch (err) {
+          showError("Failed to save: " + err.message);
+        }
+      });
+
+      // Save shopping button
+      document.getElementById("saveShopBtn").addEventListener("click", async () => {
+        const name = document.getElementById("shopName").value.trim();
+        if (!name) {
+          showError("Please enter a name.");
+          return;
+        }
+        const shopData = {
+          name,
+          category: document.getElementById("shopCategory").value,
+          priority: document.getElementById("shopPriority").value,
+          estimated_cost: document.getElementById("shopEstCost").value ? parseFloat(document.getElementById("shopEstCost").value) : null,
+          reason: document.getElementById("shopReason").value.trim() || null,
+          url: document.getElementById("shopUrl").value.trim() || null,
+          status: "wishlist",
+        };
+        try {
+          await saveToSupabase("shopping_items", shopData);
+          showSuccess("✅ Shopping item saved!");
+          document.getElementById("shopName").value = "";
+          document.getElementById("shopEstCost").value = "";
+          document.getElementById("shopReason").value = "";
+          document.getElementById("shopUrl").value = "";
+          loadShoppingItems();
+        } catch (err) {
+          showError("Failed to save: " + err.message);
+        }
+      });
+    }
+
+    // Initialize app
+    initImportFlow();
+    initMainApp();
+  </script>
+</body>
+</html>
