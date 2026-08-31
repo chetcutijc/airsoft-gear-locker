@@ -2,342 +2,759 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Gear Locker – Products</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Gear Locker</title>
   <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --accent: #22c55e;
-      --border: #1f2937;
-      --danger: #ef4444;
-    }
     * { box-sizing: border-box; }
     body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
       margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      padding: 24px 16px 64px;
+      padding: 0;
+      line-height: 1.5;
     }
-    h1 {
-      font-size: 22px;
-      margin: 0 0 16px;
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
     }
-    .toolbar {
-      display: flex;
-      gap: 12px;
+    h1, h2 {
+      color: #4ade80;
+      margin-bottom: 8px;
+    }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 24px; }
+    .card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 16px;
       margin-bottom: 16px;
-      flex-wrap: wrap;
     }
-    button, input, select {
-      background: #1f2937;
-      color: var(--text);
-      border: 1px solid var(--border);
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
       border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 14px;
+      color: #e0e0e0;
+      font-size: 1rem;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #4ade80;
     }
     button {
-      cursor: pointer;
-    }
-    button.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #052e16;
+      background: #4ade80;
+      color: #0a0a0a;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 1rem;
       font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
     }
-    button.danger {
-      background: var(--danger);
-      border-color: var(--danger);
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #3a3a3a;
+      color: #e0e0e0;
+    }
+    .hidden { display: none; }
+    .error {
+      background: #ef4444;
       color: #fff;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 12px;
-    }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 8px;
       padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      border-radius: 6px;
+      margin-bottom: 16px;
     }
-    .card h2 {
-      font-size: 16px;
+    .success {
+      background: #22c55e;
+      color: #fff;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .nav-tab {
+      flex: 1;
+      padding: 10px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      text-align: center;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .nav-tab.active {
+      background: #4ade80;
+      color: #0a0a0a;
+      border-color: #4ade80;
+    }
+    .item-list {
+      list-style: none;
+      padding: 0;
       margin: 0;
     }
-    .card a.title-link {
-      color: var(--accent);
-      text-decoration: none;
+    .item-list li {
+      background: #2a2a2a;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
     }
-    .card a.title-link:hover {
-      text-decoration: underline;
+    .item-list .item-name {
+      font-weight: 600;
+      color: #4ade80;
     }
-    .field {
-      display: grid;
-      grid-template-columns: 80px 1fr;
-      gap: 6px;
-      align-items: center;
-      font-size: 13px;
-    }
-    .field label {
-      color: var(--muted);
-    }
-    .field input, .field textarea {
-      width: 100%;
-      background: #0b1220;
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 4px;
-      padding: 4px 6px;
-      font-size: 13px;
-    }
-    .field textarea {
-      min-height: 48px;
-      resize: vertical;
-    }
-    .actions {
-      display: flex;
-      gap: 8px;
+    .item-list .item-meta {
+      font-size: 0.85rem;
+      color: #aaa;
       margin-top: 4px;
     }
-    .status {
-      font-size: 12px;
-      color: var(--muted);
-      min-height: 16px;
+    .preview-box {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .preview-box img {
+      max-width: 100%;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+    .classification-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .classification-btn {
+      flex: 1;
+      padding: 12px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      text-align: center;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .classification-btn.selected {
+      background: #4ade80;
+      color: #0a0a0a;
+      border-color: #4ade80;
     }
     .loading {
       text-align: center;
-      color: var(--muted);
-      padding: 24px;
+      padding: 20px;
+      color: #aaa;
+    }
+    .url-display {
+      background: #2a2a2a;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      word-break: break-all;
+      color: #4ade80;
+    }
+    .debug-info {
+      background: #1a1a1a;
+      border: 1px solid #3a3a3a;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.75rem;
+      color: #888;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
   </style>
 </head>
 <body>
-  <h1>Gear Locker – Products</h1>
+  <div class="container">
+    <h1>🔒 Gear Locker</h1>
+    <p style="color:#aaa;font-size:0.9rem;">Airsoft home storage and organization guide with a persistent checklist.</p>
 
-  <div class="toolbar">
-    <button id="refreshBtn" class="primary">Refresh</button>
-    <button id="addProductBtn">Add product</button>
-    <div id="globalStatus" class="status"></div>
+    <div id="errorBox" class="error hidden"></div>
+    <div id="successBox" class="success hidden"></div>
+
+    <!-- Debug info - always visible when ?url= is present -->
+    <div id="debugInfo" class="debug-info hidden"></div>
+
+    <!-- Import Flow (shown when ?url= is present) -->
+    <div id="importFlow" class="hidden">
+      <div class="card">
+        <h2>📥 Add from Link</h2>
+        <p style="color:#aaa;font-size:0.9rem;margin-bottom:16px;">Classify this product before saving to your private database.</p>
+
+        <div id="urlDisplay" class="url-display"></div>
+
+        <div id="loadingPreview" class="loading hidden">Loading product preview...</div>
+
+        <div id="previewBox" class="preview-box hidden">
+          <div id="previewImage" class="hidden" style="text-align:center;"></div>
+          <p><strong>Title:</strong> <span id="previewTitle"></span></p>
+          <p><strong>URL:</strong> <a id="previewUrl" href="#" target="_blank" rel="noopener" style="color:#4ade80;"></a></p>
+          <p><strong>Price:</strong> <span id="previewPrice">Not found</span></p>
+        </div>
+
+        <div id="manualEntry" class="hidden">
+          <p style="color:#ef4444;">Could not load product preview. Please enter details manually:</p>
+          <div class="form-group">
+            <label for="manualTitle">Title *</label>
+            <input type="text" id="manualTitle" placeholder="Product name" />
+          </div>
+          <div class="form-group">
+            <label for="manualPrice">Price (optional)</label>
+            <input type="number" id="manualPrice" step="0.01" placeholder="0.00" />
+          </div>
+        </div>
+
+        <p style="margin:16px 0 8px;"><strong>Classification *</strong></p>
+        <div class="classification-group">
+          <div class="classification-btn" data-class="owned">Owned</div>
+          <div class="classification-btn" data-class="shopping">Shopping</div>
+          <div class="classification-btn" data-class="researching">Researching</div>
+        </div>
+
+        <div class="form-group">
+          <label for="importCategory">Category</label>
+          <select id="importCategory">
+            <option value="replica">Replica</option>
+            <option value="magazine">Magazine</option>
+            <option value="holster">Holster</option>
+            <option value="eye_protection">Eye Protection</option>
+            <option value="face_protection">Face Protection</option>
+            <option value="gas">Gas</option>
+            <option value="bbs">BBs</option>
+            <option value="accessory">Accessory</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="importBrand">Brand (optional)</label>
+          <input type="text" id="importBrand" placeholder="Brand name" />
+        </div>
+
+        <div class="form-group">
+          <label for="importNotes">Notes (optional)</label>
+          <textarea id="importNotes" rows="3" placeholder="Additional details..."></textarea>
+        </div>
+
+        <button id="saveImportBtn" disabled>Save to Gear Locker</button>
+        <button class="btn-secondary" id="cancelImportBtn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Main App (shown when no ?url=) -->
+    <div id="mainApp" class="hidden">
+      <div class="nav-tabs">
+        <div class="nav-tab active" data-tab="gear">Gear</div>
+        <div class="nav-tab" data-tab="shopping">Shopping</div>
+        <div class="nav-tab" data-tab="sessions">Sessions</div>
+        <div class="nav-tab" data-tab="events">Events</div>
+      </div>
+
+      <!-- Gear Tab -->
+      <div id="gearTab">
+        <h2>➕ Add Gear Item</h2>
+        <div class="card">
+          <div class="form-group">
+            <label for="gearName">Name *</label>
+            <input type="text" id="gearName" placeholder="Item name" />
+          </div>
+          <div class="form-group">
+            <label for="gearCategory">Category</label>
+            <select id="gearCategory">
+              <option value="replica">Replica</option>
+              <option value="magazine">Magazine</option>
+              <option value="holster">Holster</option>
+              <option value="eye_protection">Eye Protection</option>
+              <option value="face_protection">Face Protection</option>
+              <option value="gas">Gas</option>
+              <option value="bbs">BBs</option>
+              <option value="accessory">Accessory</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="gearBrand">Brand (optional)</label>
+            <input type="text" id="gearBrand" placeholder="Brand name" />
+          </div>
+          <div class="form-group">
+            <label for="gearNotes">Notes (optional)</label>
+            <textarea id="gearNotes" rows="3" placeholder="Additional details..."></textarea>
+          </div>
+          <button id="saveGearBtn">Save Gear Item</button>
+        </div>
+
+        <h2>📦 Your Gear</h2>
+        <div class="card">
+          <ul id="gearList" class="item-list">
+            <li style="color:#aaa;">Loading...</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Shopping Tab -->
+      <div id="shoppingTab" class="hidden">
+        <h2>➕ Add Shopping Item</h2>
+        <div class="card">
+          <div class="form-group">
+            <label for="shopName">Name *</label>
+            <input type="text" id="shopName" placeholder="Item name" />
+          </div>
+          <div class="form-group">
+            <label for="shopCategory">Category</label>
+            <select id="shopCategory">
+              <option value="replica">Replica</option>
+              <option value="magazine">Magazine</option>
+              <option value="holster">Holster</option>
+              <option value="eye_protection">Eye Protection</option>
+              <option value="face_protection">Face Protection</option>
+              <option value="gas">Gas</option>
+              <option value="bbs">BBs</option>
+              <option value="accessory">Accessory</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="shopPriority">Priority</label>
+            <select id="shopPriority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="shopEstCost">Estimated Cost (optional)</label>
+            <input type="number" id="shopEstCost" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="form-group">
+            <label for="shopReason">Reason (optional)</label>
+            <textarea id="shopReason" rows="2" placeholder="Why do you want this?"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="shopUrl">URL (optional)</label>
+            <input type="url" id="shopUrl" placeholder="https://..." />
+          </div>
+          <button id="saveShopBtn">Save Shopping Item</button>
+        </div>
+
+        <h2>🛒 Shopping List</h2>
+        <div class="card">
+          <ul id="shoppingList" class="item-list">
+            <li style="color:#aaa;">Loading...</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Sessions Tab -->
+      <div id="sessionsTab" class="hidden">
+        <h2>📅 Practice Sessions</h2>
+        <div class="card">
+          <p style="color:#aaa;">Session tracking coming soon.</p>
+        </div>
+      </div>
+
+      <!-- Events Tab -->
+      <div id="eventsTab" class="hidden">
+        <h2>🎯 Events</h2>
+        <div class="card">
+          <p style="color:#aaa;">Event tracking coming soon.</p>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="grid" class="grid"></div>
-
   <script>
+    // Supabase configuration
     const SUPABASE_URL = "https://jcheoqzbkfavjwuyesku.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_5xj3YyY41_49kcQ6OQR4dg_lbf1ryRl";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjaGVvcXpia2Zhdmp3dXllc2t1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMTcxMzMsImV4cCI6MjEwMzY5MzEzM30.i6Ezt82JNQelXMh06n7GXgVa4esPTqd8AMlj2mTVuyM";
 
-    const grid = document.getElementById("grid");
-    const globalStatus = document.getElementById("globalStatus");
-    const refreshBtn = document.getElementById("refreshBtn");
-    const addProductBtn = document.getElementById("addProductBtn");
+    // State
+    let selectedClassification = null;
+    let importedUrl = "";
+    let importedMeta = null;
 
-    let products = [];
+    // Utility functions
+    function showError(msg) {
+      const box = document.getElementById("errorBox");
+      box.textContent = msg;
+      box.classList.remove("hidden");
+      console.error("Error:", msg);
+      setTimeout(() => box.classList.add("hidden"), 10000);
+    }
 
-    async function fetchProducts() {
-      grid.innerHTML = '<div class="loading">Loading products…</div>';
-      globalStatus.textContent = "";
+    function showSuccess(msg) {
+      const box = document.getElementById("successBox");
+      box.textContent = msg;
+      box.classList.remove("hidden");
+      setTimeout(() => box.classList.add("hidden"), 5000);
+    }
+
+    function hideAllTabs() {
+      document.getElementById("gearTab").classList.add("hidden");
+      document.getElementById("shoppingTab").classList.add("hidden");
+      document.getElementById("sessionsTab").classList.add("hidden");
+      document.getElementById("eventsTab").classList.add("hidden");
+      document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+    }
+
+    // Fetch product metadata from Edge Function
+    async function fetchProductMeta(url) {
+      console.log("🔍 Fetching metadata for:", url);
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/products?order=created_at.desc`, {
-          headers: {
-            "apikey": SUPABASE_KEY,
-            "Authorization": `Bearer ${SUPABASE_KEY}`,
-            "Content-Type": "application/json",
-            "Prefer": "count=exact"
-          }
-        });
-        if (!res.ok) throw new Error("Failed to load products");
-        products = await res.json();
-        render();
-      } catch (err) {
-        grid.innerHTML = "";
-        globalStatus.textContent = "Error loading products: " + err.message;
-      }
-    }
-
-    function render() {
-      grid.innerHTML = "";
-      if (!products.length) {
-        grid.innerHTML = '<div class="loading">No products yet.</div>';
-        return;
-      }
-      for (const p of products) {
-        grid.appendChild(renderCard(p));
-      }
-    }
-
-    function renderCard(product) {
-      const card = document.createElement("div");
-      card.className = "card";
-
-      const titleRow = document.createElement("div");
-      titleRow.style.display = "flex";
-      titleRow.style.justifyContent = "space-between";
-      titleRow.style.alignItems = "center";
-      titleRow.style.gap = "8px";
-
-      const titleLink = document.createElement("a");
-      titleLink.className = "title-link";
-      titleLink.textContent = product.title || "(no title)";
-      titleLink.href = product.source_url || "#";
-      titleLink.target = "_blank";
-      titleLink.rel = "noopener noreferrer";
-      titleRow.appendChild(titleLink);
-
-      const idLabel = document.createElement("div");
-      idLabel.style.fontSize = "12px";
-      idLabel.style.color = "var(--muted)";
-      idLabel.textContent = "id: " + product.id;
-      titleRow.appendChild(idLabel);
-
-      card.appendChild(titleRow);
-
-      const fields = [
-        { key: "title", label: "Title", type: "text" },
-        { key: "description", label: "Description", type: "textarea" },
-        { key: "price", label: "Price", type: "text" },
-        { key: "currency", label: "Currency", type: "text" },
-        { key: "image_url", label: "Image URL", type: "text" },
-        { key: "source_url", label: "Source URL", type: "text" }
-      ];
-
-      const inputs = {};
-
-      for (const f of fields) {
-        const row = document.createElement("div");
-        row.className = "field";
-
-        const label = document.createElement("label");
-        label.textContent = f.label;
-        row.appendChild(label);
-
-        let input;
-        if (f.type === "textarea") {
-          input = document.createElement("textarea");
-        } else {
-          input = document.createElement("input");
-          input.type = f.type === "text" ? "text" : f.type;
-        }
-        input.value = product[f.key] ?? "";
-        row.appendChild(input);
-        card.appendChild(row);
-        inputs[f.key] = input;
-      }
-
-      const actions = document.createElement("div");
-      actions.className = "actions";
-
-      const saveBtn = document.createElement("button");
-      saveBtn.textContent = "Save";
-      saveBtn.className = "primary";
-
-      const deleteBtn = document.createElement("button");
-      deleteBtn.textContent = "Delete";
-      deleteBtn.className = "danger";
-
-      const status = document.createElement("div");
-      status.className = "status";
-
-      actions.appendChild(saveBtn);
-      actions.appendChild(deleteBtn);
-      card.appendChild(actions);
-      card.appendChild(status);
-
-      saveBtn.addEventListener("click", async () => {
-        status.textContent = "Saving…";
-        const updates = {};
-        for (const f of fields) {
-          updates[f.key] = inputs[f.key].value;
-        }
-        try {
-          const res = await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.${product.id}`, {
-            method: "PATCH",
-            headers: {
-              "apikey": SUPABASE_KEY,
-              "Authorization": `Bearer ${SUPABASE_KEY}`,
-              "Content-Type": "application/json",
-              "Prefer": "return=minimal"
-            },
-            body: JSON.stringify(updates)
-          });
-          if (!res.ok) throw new Error("Save failed");
-          status.textContent = "Saved";
-          setTimeout(() => (status.textContent = ""), 1500);
-          Object.assign(product, updates);
-          titleLink.textContent = product.title || "(no title)";
-          titleLink.href = product.source_url || "#";
-        } catch (err) {
-          status.textContent = "Error: " + err.message;
-        }
-      });
-
-      deleteBtn.addEventListener("click", async () => {
-        if (!confirm("Delete this product?")) return;
-        status.textContent = "Deleting…";
-        try {
-          const res = await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.${product.id}`, {
-            method: "DELETE",
-            headers: {
-              "apikey": SUPABASE_KEY,
-              "Authorization": `Bearer ${SUPABASE_KEY}`,
-              "Prefer": "return=minimal"
-            }
-          });
-          if (!res.ok) throw new Error("Delete failed");
-          products = products.filter(p => p.id !== product.id);
-          render();
-          globalStatus.textContent = "Product deleted";
-          setTimeout(() => (globalStatus.textContent = ""), 2000);
-        } catch (err) {
-          status.textContent = "Error: " + err.message;
-        }
-      });
-
-      return card;
-    }
-
-    async function addProduct() {
-      globalStatus.textContent = "Creating product…";
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/fetch-product-meta`, {
           method: "POST",
           headers: {
-            "apikey": SUPABASE_KEY,
-            "Authorization": `Bearer ${SUPABASE_KEY}`,
             "Content-Type": "application/json",
-            "Prefer": "return=representation"
           },
-          body: JSON.stringify({
-            title: "New product",
-            description: "",
-            price: null,
-            currency: null,
-            image_url: null,
-            source_url: null
-          })
+          body: JSON.stringify({ url }),
         });
-        if (!res.ok) throw new Error("Create failed");
-        const [created] = await res.json();
-        products.unshift(created);
-        render();
-        globalStatus.textContent = "Product created";
-        setTimeout(() => (globalStatus.textContent = ""), 2000);
+
+        console.log("📡 Response status:", response.status);
+        const data = await response.json();
+        console.log("📦 Response data:", data);
+
+        if (!response.ok) {
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        return data;
       } catch (err) {
-        globalStatus.textContent = "Error creating product: " + err.message;
+        console.error("❌ Fetch meta error:", err);
+        return null;
       }
     }
 
-    refreshBtn.addEventListener("click", fetchProducts);
-    addProductBtn.addEventListener("click", addProduct);
+    // Save to Supabase
+    async function saveToSupabase(table, data) {
+      try {
+        console.log("💾 Saving to", table, data);
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(data),
+        });
 
-    fetchProducts();
+        console.log("💾 Save response:", response.status);
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || "Save failed");
+        }
+        return await response.json();
+      } catch (err) {
+        console.error("❌ Save error:", err);
+        throw err;
+      }
+    }
+
+    // Load items from Supabase
+    async function loadItems(table) {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.desc&limit=50`, {
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load items");
+        }
+        return await response.json();
+      } catch (err) {
+        console.error("Load error:", err);
+        return [];
+      }
+    }
+
+    // Initialize import flow
+    async function initImportFlow() {
+      const params = new URLSearchParams(window.location.search);
+      const url = params.get("url");
+      
+      // Get all params for debugging
+      const allParams = {};
+      params.forEach((value, key) => {
+        allParams[key] = value;
+      });
+
+      const debugInfo = document.getElementById("debugInfo");
+      debugInfo.textContent = `URL: ${window.location.href}\nSearch: ${window.location.search}\nParams: ${JSON.stringify(allParams)}\nURL param: ${url || "(none)"}`;
+      debugInfo.classList.remove("hidden");
+
+      console.log("📍 Full URL:", window.location.href);
+      console.log("📍 Search:", window.location.search);
+      console.log("📍 URL param:", url);
+
+      if (!url) {
+        console.log("✅ No URL param, showing main app");
+        document.getElementById("mainApp").classList.remove("hidden");
+        document.getElementById("debugInfo").classList.add("hidden");
+        loadGearItems();
+        loadShoppingItems();
+        return;
+      }
+
+      console.log("🚀 Starting import flow");
+      importedUrl = url;
+      document.getElementById("importFlow").classList.remove("hidden");
+      document.getElementById("mainApp").classList.add("hidden");
+      document.getElementById("urlDisplay").textContent = "Importing: " + url;
+
+      // Show manual entry immediately as fallback
+      document.getElementById("manualEntry").classList.remove("hidden");
+      document.getElementById("loadingPreview").classList.add("hidden");
+
+      // Fetch metadata in background
+      console.log("🔄 Fetching metadata...");
+      const meta = await fetchProductMeta(url);
+      console.log("📬 Metadata result:", meta);
+
+      if (meta) {
+        importedMeta = meta;
+        document.getElementById("previewBox").classList.remove("hidden");
+        document.getElementById("manualEntry").classList.add("hidden");
+        document.getElementById("previewTitle").textContent = meta.title;
+        document.getElementById("previewUrl").textContent = meta.url;
+        document.getElementById("previewUrl").href = meta.url;
+        if (meta.price) {
+          document.getElementById("previewPrice").textContent = `€${meta.price.toFixed(2)}`;
+        } else {
+          document.getElementById("previewPrice").textContent = "Not found";
+        }
+        if (meta.image) {
+          document.getElementById("previewImage").innerHTML = `<img src="${meta.image}" alt="Product image" />`;
+          document.getElementById("previewImage").classList.remove("hidden");
+        }
+      } else {
+        console.log("⚠️ No metadata, keeping manual entry");
+      }
+
+      // Classification buttons
+      document.querySelectorAll(".classification-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".classification-btn").forEach(b => b.classList.remove("selected"));
+          btn.classList.add("selected");
+          selectedClassification = btn.dataset.class;
+          document.getElementById("saveImportBtn").disabled = false;
+        });
+      });
+
+      // Save button
+      document.getElementById("saveImportBtn").addEventListener("click", saveImport);
+      document.getElementById("cancelImportBtn").addEventListener("click", () => {
+        window.history.pushState({}, "", window.location.pathname);
+        location.reload();
+      });
+    }
+
+    // Save imported item
+    async function saveImport() {
+      if (!selectedClassification) {
+        showError("Please select a classification.");
+        return;
+      }
+
+      const category = document.getElementById("importCategory").value;
+      const brand = document.getElementById("importBrand").value.trim();
+      const notes = document.getElementById("importNotes").value.trim();
+
+      let title = importedMeta ? importedMeta.title : document.getElementById("manualTitle").value.trim();
+      let price = importedMeta ? importedMeta.price : null;
+      if (!price) {
+        const manualPrice = document.getElementById("manualPrice").value;
+        price = manualPrice ? parseFloat(manualPrice) : null;
+      }
+
+      if (!title) {
+        showError("Please enter a title.");
+        return;
+      }
+
+      const commonData = {
+        source_url: importedUrl,
+        source_title: title,
+        source_image_url: importedMeta?.image || null,
+        price,
+        import_status: "imported",
+        last_checked_at: new Date().toISOString(),
+      };
+
+      try {
+        if (selectedClassification === "owned") {
+          const gearData = {
+            ...commonData,
+            name: title,
+            category,
+            brand: brand || null,
+            notes: notes || null,
+          };
+          await saveToSupabase("gear_items", gearData);
+          showSuccess("✅ Gear item saved!");
+        } else {
+          const status = selectedClassification === "shopping" ? "wishlist" : "researching";
+          const shopData = {
+            ...commonData,
+            name: title,
+            category,
+            status,
+            priority: "medium",
+            estimated_cost: price,
+            url: importedUrl,
+            notes: notes || null,
+          };
+          await saveToSupabase("shopping_items", shopData);
+          showSuccess(selectedClassification === "shopping" ? "✅ Shopping item saved!" : "✅ Researching item saved!");
+        }
+
+        setTimeout(() => {
+          window.history.pushState({}, "", window.location.pathname);
+          location.reload();
+        }, 1500);
+      } catch (err) {
+        showError("Failed to save: " + err.message);
+      }
+    }
+
+    // Load gear items
+    async function loadGearItems() {
+      const items = await loadItems("gear_items");
+      const list = document.getElementById("gearList");
+      if (items.length === 0) {
+        list.innerHTML = '<li style="color:#aaa;">No gear items yet.</li>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+        <li>
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-meta">
+            ${item.category}${item.brand ? " • " + escapeHtml(item.brand) : ""}
+            ${item.price ? " • €" + item.price.toFixed(2) : ""}
+          </div>
+        </li>
+      `).join("");
+    }
+
+    // Load shopping items
+    async function loadShoppingItems() {
+      const items = await loadItems("shopping_items");
+      const list = document.getElementById("shoppingList");
+      if (items.length === 0) {
+        list.innerHTML = '<li style="color:#aaa;">No shopping items yet.</li>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+        <li>
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-meta">
+            ${item.category} • ${item.status}${item.estimated_cost ? " • €" + item.estimated_cost.toFixed(2) : ""}
+          </div>
+        </li>
+      `).join("");
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Initialize main app tabs
+    function initMainApp() {
+      document.querySelectorAll(".nav-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          hideAllTabs();
+          tab.classList.add("active");
+          const tabName = tab.dataset.tab;
+          if (tabName === "gear") document.getElementById("gearTab").classList.remove("hidden");
+          if (tabName === "shopping") document.getElementById("shoppingTab").classList.remove("hidden");
+          if (tabName === "sessions") document.getElementById("sessionsTab").classList.remove("hidden");
+          if (tabName === "events") document.getElementById("eventsTab").classList.remove("hidden");
+        });
+      });
+
+      document.getElementById("saveGearBtn").addEventListener("click", async () => {
+        const name = document.getElementById("gearName").value.trim();
+        if (!name) {
+          showError("Please enter a name.");
+          return;
+        }
+        const gearData = {
+          name,
+          category: document.getElementById("gearCategory").value,
+          brand: document.getElementById("gearBrand").value.trim() || null,
+          notes: document.getElementById("gearNotes").value.trim() || null,
+        };
+        try {
+          await saveToSupabase("gear_items", gearData);
+          showSuccess("✅ Gear item saved!");
+          document.getElementById("gearName").value = "";
+          document.getElementById("gearBrand").value = "";
+          document.getElementById("gearNotes").value = "";
+          loadGearItems();
+        } catch (err) {
+          showError("Failed to save: " + err.message);
+        }
+      });
+
+      document.getElementById("saveShopBtn").addEventListener("click", async () => {
+        const name = document.getElementById("shopName").value.trim();
+        if (!name) {
+          showError("Please enter a name.");
+          return;
+        }
+        const shopData = {
+          name,
+          category: document.getElementById("shopCategory").value,
+          priority: document.getElementById("shopPriority").value,
+          estimated_cost: document.getElementById("shopEstCost").value ? parseFloat(document.getElementById("shopEstCost").value) : null,
+          reason: document.getElementById("shopReason").value.trim() || null,
+          url: document.getElementById("shopUrl").value.trim() || null,
+          status: "wishlist",
+        };
+        try {
+          await saveToSupabase("shopping_items", shopData);
+          showSuccess("✅ Shopping item saved!");
+          document.getElementById("shopName").value = "";
+          document.getElementById("shopEstCost").value = "";
+          document.getElementById("shopReason").value = "";
+          document.getElementById("shopUrl").value = "";
+          loadShoppingItems();
+        } catch (err) {
+          showError("Failed to save: " + err.message);
+        }
+      });
+    }
+
+    // Initialize app
+    initImportFlow();
+    initMainApp();
   </script>
 </body>
 </html>
