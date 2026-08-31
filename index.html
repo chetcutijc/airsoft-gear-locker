@@ -8,13 +8,15 @@
     :root {
       --bg: #0f172a;
       --panel: #111827;
-      --panel-2: #172033;
+      --input: #0b1220;
       --text: #e5e7eb;
       --muted: #94a3b8;
       --line: #263247;
       --accent: #22c55e;
-      --accent-dark: #052e16;
-      --danger: #fca5a5;
+      --accent-text: #052e16;
+      --button-secondary: #263247;
+      --error: #fca5a5;
+      --success: #86efac;
     }
 
     * { box-sizing: border-box; }
@@ -28,14 +30,14 @@
     }
 
     main {
-      max-width: 900px;
+      width: min(920px, 100%);
       margin: 0 auto;
       padding: 24px 16px 56px;
     }
 
     h1 {
       margin: 0 0 8px;
-      font-size: clamp(28px, 7vw, 38px);
+      font-size: clamp(28px, 8vw, 40px);
       line-height: 1.1;
     }
 
@@ -44,13 +46,22 @@
       font-size: 20px;
     }
 
+    h3 {
+      margin: 0 0 5px;
+      font-size: 17px;
+    }
+
     p { line-height: 1.45; }
 
-    .subtitle, small {
+    .subtitle,
+    small,
+    .meta {
       color: var(--muted);
     }
 
-    .hidden { display: none !important; }
+    .hidden {
+      display: none !important;
+    }
 
     .panel {
       margin: 16px 0;
@@ -73,21 +84,38 @@
       overflow-wrap: anywhere;
     }
 
-    .auth-fields {
+    .form-grid {
       display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
-      max-width: 420px;
     }
 
-    input {
+    .form-grid .full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    input,
+    textarea {
       width: 100%;
       min-height: 44px;
       padding: 10px 12px;
       border: 1px solid #334155;
       border-radius: 9px;
       color: var(--text);
-      background: #0b1220;
+      background: var(--input);
       font: inherit;
+    }
+
+    textarea {
+      min-height: 104px;
+      resize: vertical;
     }
 
     button {
@@ -96,14 +124,14 @@
       border: 0;
       border-radius: 9px;
       background: var(--accent);
-      color: var(--accent-dark);
+      color: var(--accent-text);
       font: inherit;
       font-weight: 750;
       cursor: pointer;
     }
 
     button.secondary {
-      background: #263247;
+      background: var(--button-secondary);
       color: var(--text);
     }
 
@@ -112,13 +140,26 @@
       opacity: 0.65;
     }
 
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
     .status {
       min-height: 1.4em;
       margin: 12px 0 0;
       color: var(--muted);
     }
 
-    .error { color: var(--danger); }
+    .error {
+      color: var(--error);
+    }
+
+    .success {
+      color: var(--success);
+    }
 
     .list {
       display: grid;
@@ -135,17 +176,6 @@
       border-top: 0;
     }
 
-    .item-title {
-      margin: 0 0 5px;
-      font-size: 17px;
-    }
-
-    .meta {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
     .notes {
       margin: 8px 0 0;
       white-space: pre-wrap;
@@ -159,6 +189,16 @@
     a:hover,
     a:focus-visible {
       text-decoration: underline;
+    }
+
+    @media (max-width: 620px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-grid .full {
+        grid-column: auto;
+      }
     }
   </style>
 </head>
@@ -175,9 +215,31 @@
         Sign in with the Supabase account that owns your Gear Locker data.
       </p>
 
-      <div class="auth-fields">
-        <input id="email" type="email" autocomplete="email" placeholder="Email address" required>
-        <input id="password" type="password" autocomplete="current-password" placeholder="Password" required>
+      <div class="form-grid">
+        <label class="full">
+          Email address
+          <input
+            id="email"
+            type="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          >
+        </label>
+
+        <label class="full">
+          Password
+          <input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Password"
+            required
+          >
+        </label>
+      </div>
+
+      <div class="actions">
         <button id="signInButton" type="button">Sign in</button>
       </div>
 
@@ -185,16 +247,88 @@
     </section>
 
     <section id="app" class="hidden">
-      <div class="panel toolbar">
+      <section class="panel toolbar">
         <div>
-          <div class="identity">Signed in as <span id="userEmail"></span></div>
-          <small>Your records remain protected by Supabase row-level security.</small>
+          <div class="identity">
+            Signed in as <span id="userEmail"></span>
+          </div>
+          <small>Your inventory is protected by Supabase row-level security.</small>
         </div>
-        <div>
+
+        <div class="actions">
           <button id="refreshButton" class="secondary" type="button">Refresh</button>
           <button id="signOutButton" class="secondary" type="button">Sign out</button>
         </div>
-      </div>
+      </section>
+
+      <section id="importPanel" class="panel hidden">
+        <h2>Import shared product</h2>
+        <p id="importStatus" class="status" aria-live="polite"></p>
+
+        <div id="importForm" class="hidden">
+          <div class="form-grid">
+            <label class="full">
+              Product name
+              <input id="importName" type="text" placeholder="Product name" required>
+            </label>
+
+            <label>
+              Price
+              <input
+                id="importPrice"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Leave blank if unknown"
+              >
+            </label>
+
+            <label>
+              Currency
+              <input
+                id="importCurrency"
+                type="text"
+                maxlength="3"
+                placeholder="EUR"
+              >
+            </label>
+
+            <label class="full">
+              Product URL
+              <input
+                id="importSourceUrl"
+                type="url"
+                placeholder="https://…"
+                required
+              >
+            </label>
+
+            <label class="full">
+              Image URL
+              <input id="importImageUrl" type="url" placeholder="Optional">
+            </label>
+
+            <label class="full">
+              Availability
+              <input id="importAvailability" type="text" placeholder="Optional">
+            </label>
+
+            <label class="full">
+              Product notes / description
+              <textarea id="importNotes" placeholder="Optional"></textarea>
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="saveImportedItemButton" type="button">
+              Add to Shopping List
+            </button>
+            <button id="cancelImportButton" class="secondary" type="button">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section class="panel">
         <h2>Current Gear</h2>
@@ -214,22 +348,48 @@
     import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
     const SUPABASE_URL = "https://jcheoqzbkfavjwuyesku.supabase.co";
-    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5xj3YyY41_49kcQ6OQR4dg_lbf1ryRl";
+    const SUPABASE_PUBLISHABLE_KEY =
+      "sb_publishable_5xj3YyY41_49kcQ6OQR4dg_lbf1ryRl";
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+    const supabase = createClient(
+      SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY
+    );
 
     const authPanel = document.getElementById("authPanel");
     const app = document.getElementById("app");
+
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
     const signInButton = document.getElementById("signInButton");
     const signOutButton = document.getElementById("signOutButton");
     const refreshButton = document.getElementById("refreshButton");
+
     const authStatus = document.getElementById("authStatus");
     const appStatus = document.getElementById("appStatus");
     const userEmail = document.getElementById("userEmail");
+
     const gearList = document.getElementById("gearList");
     const shoppingList = document.getElementById("shoppingList");
+
+    const importPanel = document.getElementById("importPanel");
+    const importStatus = document.getElementById("importStatus");
+    const importForm = document.getElementById("importForm");
+
+    const importName = document.getElementById("importName");
+    const importPrice = document.getElementById("importPrice");
+    const importCurrency = document.getElementById("importCurrency");
+    const importSourceUrl = document.getElementById("importSourceUrl");
+    const importImageUrl = document.getElementById("importImageUrl");
+    const importAvailability = document.getElementById("importAvailability");
+    const importNotes = document.getElementById("importNotes");
+
+    const saveImportedItemButton = document.getElementById(
+      "saveImportedItemButton"
+    );
+    const cancelImportButton = document.getElementById("cancelImportButton");
+
+    let importHandled = false;
 
     function escapeHtml(value) {
       const element = document.createElement("div");
@@ -239,22 +399,66 @@
 
     function sourceLink(url) {
       if (!url) return "";
+
       return ` · <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Source</a>`;
     }
 
     function showError(target, message) {
+      target.classList.remove("success");
       target.classList.add("error");
       target.textContent = message;
     }
 
-    function showStatus(target, message) {
+    function showSuccess(target, message) {
       target.classList.remove("error");
+      target.classList.add("success");
       target.textContent = message;
+    }
+
+    function showStatus(target, message) {
+      target.classList.remove("error", "success");
+      target.textContent = message;
+    }
+
+    function getSharedProductUrl() {
+      const params = new URLSearchParams(window.location.search);
+
+      return (
+        params.get("url") ||
+        params.get("shared_url") ||
+        params.get("input")
+      );
+    }
+
+    function clearSharedProductUrl() {
+      const cleanUrl = new URL(window.location.href);
+
+      cleanUrl.searchParams.delete("url");
+      cleanUrl.searchParams.delete("shared_url");
+      cleanUrl.searchParams.delete("input");
+
+      window.history.replaceState({}, "", cleanUrl);
+    }
+
+    function resetImportPanel() {
+      importPanel.classList.add("hidden");
+      importForm.classList.add("hidden");
+
+      importName.value = "";
+      importPrice.value = "";
+      importCurrency.value = "";
+      importSourceUrl.value = "";
+      importImageUrl.value = "";
+      importAvailability.value = "";
+      importNotes.value = "";
+
+      showStatus(importStatus, "");
     }
 
     function renderGear(items) {
       if (!items.length) {
-        gearList.innerHTML = "<p class=\"subtitle\">No current gear yet.</p>";
+        gearList.innerHTML =
+          '<p class="subtitle">No current gear yet.</p>';
         return;
       }
 
@@ -266,13 +470,22 @@
           item.status,
           item.price != null ? `Price: ${item.price}` : null,
           item.availability
-        ].filter(Boolean).map(escapeHtml).join(" · ");
+        ]
+          .filter(Boolean)
+          .map(escapeHtml)
+          .join(" · ");
 
         return `
           <article class="item">
-            <h3 class="item-title">${escapeHtml(item.name)}</h3>
-            <div class="meta">${details}${sourceLink(item.source_url)}</div>
-            ${item.notes ? `<p class="notes">${escapeHtml(item.notes)}</p>` : ""}
+            <h3>${escapeHtml(item.name)}</h3>
+            <div class="meta">
+              ${details}${sourceLink(item.source_url)}
+            </div>
+            ${
+              item.notes
+                ? `<p class="notes">${escapeHtml(item.notes)}</p>`
+                : ""
+            }
           </article>
         `;
       }).join("");
@@ -280,12 +493,14 @@
 
     function renderShopping(items) {
       if (!items.length) {
-        shoppingList.innerHTML = "<p class=\"subtitle\">No shopping items yet.</p>";
+        shoppingList.innerHTML =
+          '<p class="subtitle">No shopping items yet.</p>';
         return;
       }
 
       shoppingList.innerHTML = items.map((item) => {
         const cost = item.price ?? item.estimated_cost;
+
         const details = [
           item.category,
           item.priority ? `Priority: ${item.priority}` : null,
@@ -293,21 +508,117 @@
           item.purchased ? "Purchased" : null,
           cost != null ? `Price: ${cost}` : null,
           item.availability
-        ].filter(Boolean).map(escapeHtml).join(" · ");
+        ]
+          .filter(Boolean)
+          .map(escapeHtml)
+          .join(" · ");
 
         return `
           <article class="item">
-            <h3 class="item-title">${escapeHtml(item.name)}</h3>
-            <div class="meta">${details}${sourceLink(item.source_url || item.url)}</div>
-            ${item.reason ? `<p class="notes">${escapeHtml(item.reason)}</p>` : ""}
-            ${item.notes ? `<p class="notes">${escapeHtml(item.notes)}</p>` : ""}
+            <h3>${escapeHtml(item.name)}</h3>
+            <div class="meta">
+              ${details}${sourceLink(item.source_url || item.url)}
+            </div>
+            ${
+              item.reason
+                ? `<p class="notes">${escapeHtml(item.reason)}</p>`
+                : ""
+            }
+            ${
+              item.notes
+                ? `<p class="notes">${escapeHtml(item.notes)}</p>`
+                : ""
+            }
           </article>
         `;
       }).join("");
     }
 
+    async function importSharedProduct() {
+      if (importHandled) return;
+
+      const sharedUrl = getSharedProductUrl();
+      if (!sharedUrl) return;
+
+      importHandled = true;
+      importPanel.classList.remove("hidden");
+      importForm.classList.add("hidden");
+
+      let parsedUrl;
+
+      try {
+        parsedUrl = new URL(sharedUrl);
+      } catch {
+        showError(
+          importStatus,
+          "The shared product link is not a valid URL."
+        );
+        clearSharedProductUrl();
+        return;
+      }
+
+      if (parsedUrl.protocol !== "https:") {
+        showError(
+          importStatus,
+          "Only HTTPS product links can be imported."
+        );
+        clearSharedProductUrl();
+        return;
+      }
+
+      showStatus(importStatus, "Reading product details…");
+
+      const { data, error } = await supabase.functions.invoke(
+        "fetch-product-meta",
+        {
+          body: {
+            url: parsedUrl.toString()
+          }
+        }
+      );
+
+      importSourceUrl.value = parsedUrl.toString();
+
+      if (error || data?.error) {
+        showError(
+          importStatus,
+          `Could not import product metadata: ${
+            data?.error || error?.message || "Unknown error"
+          }`
+        );
+
+        importForm.classList.remove("hidden");
+        clearSharedProductUrl();
+        return;
+      }
+
+      importName.value = data.title || "";
+      importPrice.value = data.price || "";
+      importCurrency.value = data.currency || "";
+      importImageUrl.value = data.image || "";
+      importNotes.value = data.description || "";
+
+      importForm.classList.remove("hidden");
+
+      if (data.price == null || data.currency == null) {
+        showStatus(
+          importStatus,
+          "Product details loaded. No reliable structured price was found, so price was left blank for your review."
+        );
+      } else {
+        showStatus(
+          importStatus,
+          "Product details loaded. Review the fields before saving."
+        );
+      }
+
+      clearSharedProductUrl();
+    }
+
     async function loadDashboard() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
 
       authPanel.classList.toggle("hidden", Boolean(user));
       app.classList.toggle("hidden", !user);
@@ -319,16 +630,29 @@
       }
 
       userEmail.textContent = user.email || "Signed-in user";
+
       showStatus(appStatus, "Loading your gear…");
 
       const [gearResponse, shoppingResponse] = await Promise.all([
-        supabase.from("gear_items").select("*").order("created_at", { ascending: false }),
-        supabase.from("shopping_items").select("*").order("created_at", { ascending: false })
+        supabase
+          .from("gear_items")
+          .select("*")
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("shopping_items")
+          .select("*")
+          .order("created_at", { ascending: false })
       ]);
 
       if (gearResponse.error || shoppingResponse.error) {
         const error = gearResponse.error || shoppingResponse.error;
-        showError(appStatus, `Could not load your data: ${error.message}`);
+
+        showError(
+          appStatus,
+          `Could not load your data: ${error.message}`
+        );
+
         gearList.innerHTML = "";
         shoppingList.innerHTML = "";
         return;
@@ -336,7 +660,10 @@
 
       renderGear(gearResponse.data || []);
       renderShopping(shoppingResponse.data || []);
+
       showStatus(appStatus, "");
+
+      await importSharedProduct();
     }
 
     async function signIn() {
@@ -344,14 +671,20 @@
       const password = passwordInput.value;
 
       if (!email || !password) {
-        showError(authStatus, "Enter both your email address and password.");
+        showError(
+          authStatus,
+          "Enter both your email address and password."
+        );
         return;
       }
 
       signInButton.disabled = true;
       showStatus(authStatus, "Signing in…");
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
       signInButton.disabled = false;
 
@@ -362,20 +695,124 @@
 
       passwordInput.value = "";
       showStatus(authStatus, "");
+
       await loadDashboard();
     }
+
+    saveImportedItemButton.addEventListener("click", async () => {
+      const name = importName.value.trim();
+      const sourceUrl = importSourceUrl.value.trim();
+      const rawPrice = importPrice.value.trim();
+
+      if (!name || !sourceUrl) {
+        showError(
+          importStatus,
+          "Product name and source URL are required."
+        );
+        return;
+      }
+
+      let parsedUrl;
+
+      try {
+        parsedUrl = new URL(sourceUrl);
+      } catch {
+        showError(importStatus, "Enter a valid source URL.");
+        return;
+      }
+
+      if (parsedUrl.protocol !== "https:") {
+        showError(importStatus, "Source URL must use HTTPS.");
+        return;
+      }
+
+      const price = rawPrice === "" ? null : Number(rawPrice);
+
+      if (
+        price !== null &&
+        (!Number.isFinite(price) || price < 0)
+      ) {
+        showError(
+          importStatus,
+          "Price must be a non-negative number."
+        );
+        return;
+      }
+
+      const currency = importCurrency.value.trim().toUpperCase();
+
+      if (currency && !/^[A-Z]{3}$/.test(currency)) {
+        showError(
+          importStatus,
+          "Currency must be a 3-letter code, such as EUR."
+        );
+        return;
+      }
+
+      saveImportedItemButton.disabled = true;
+      showStatus(importStatus, "Adding to Shopping List…");
+
+      const { error } = await supabase
+        .from("shopping_items")
+        .insert({
+          name,
+          category: "other",
+          priority: "medium",
+          status: "wishlist",
+          source_url: parsedUrl.toString(),
+          source_title: name,
+          source_image_url: importImageUrl.value.trim() || null,
+          price,
+          availability: importAvailability.value.trim() || null,
+          reason: importNotes.value.trim() || null,
+          import_status: "imported",
+          last_checked_at: new Date().toISOString()
+        });
+
+      saveImportedItemButton.disabled = false;
+
+      if (error) {
+        showError(
+          importStatus,
+          `Could not add item: ${error.message}`
+        );
+        return;
+      }
+
+      showSuccess(
+        importStatus,
+        "Added to your Shopping List."
+      );
+
+      await loadDashboard();
+
+      setTimeout(resetImportPanel, 1200);
+    });
+
+    cancelImportButton.addEventListener(
+      "click",
+      resetImportPanel
+    );
 
     signInButton.addEventListener("click", signIn);
 
     passwordInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") signIn();
+      if (event.key === "Enter") {
+        signIn();
+      }
     });
 
-    refreshButton.addEventListener("click", loadDashboard);
+    refreshButton.addEventListener(
+      "click",
+      loadDashboard
+    );
 
     signOutButton.addEventListener("click", async () => {
       await supabase.auth.signOut();
+
+      importHandled = false;
       showStatus(authStatus, "");
+
       await loadDashboard();
     });
 
