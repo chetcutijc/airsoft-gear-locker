@@ -393,6 +393,16 @@
       document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
     }
 
+    // v5 compatibility: Edge Function v5 returns prices as strings.
+    // Normalize to a finite number, or null when there is no usable price.
+    function normalizePrice(value) {
+      if (value === null || value === undefined || value === "") {
+        return null;
+      }
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    }
+
     // Fetch product metadata from Edge Function
     async function fetchProductMeta(url) {
       try {
@@ -479,14 +489,21 @@
       const meta = await fetchProductMeta(url);
       document.getElementById("loadingPreview").classList.add("hidden");
 
-      if (meta) {
+      // v5 compatibility: v5 answers HTTP 200 with metadata_found:false when a
+      // retailer blocks the fetch or exposes nothing usable, so a truthy meta is
+      // no longer proof of a usable preview. A title is also required, because
+      // the save path has no other source for one once the preview is showing.
+      if (meta && meta.metadata_found !== false && meta.title) {
         importedMeta = meta;
         document.getElementById("previewBox").classList.remove("hidden");
         document.getElementById("previewTitle").textContent = meta.title;
-        document.getElementById("previewUrl").textContent = meta.url;
-        document.getElementById("previewUrl").href = meta.url;
-        if (meta.price) {
-          document.getElementById("previewPrice").textContent = `€${meta.price.toFixed(2)}`;
+        // v5 compatibility: Edge Function v5 returns the final URL as source_url.
+        const productUrl = meta.source_url || meta.url || importedUrl;
+        document.getElementById("previewUrl").textContent = productUrl;
+        document.getElementById("previewUrl").href = productUrl;
+        const numericPrice = normalizePrice(meta.price);
+        if (numericPrice !== null) {
+          document.getElementById("previewPrice").textContent = `€${numericPrice.toFixed(2)}`;
         }
         if (meta.image) {
           document.getElementById("previewImage").innerHTML = `<img src="${meta.image}" alt="Product image" />`;
@@ -494,6 +511,9 @@
         }
       } else {
         document.getElementById("manualEntry").classList.remove("hidden");
+        if (meta && meta.warning) {
+          showError(meta.warning);
+        }
       }
 
       // Classification buttons
@@ -526,10 +546,10 @@
       const notes = document.getElementById("importNotes").value.trim();
 
       let title = importedMeta ? importedMeta.title : document.getElementById("manualTitle").value.trim();
-      let price = importedMeta ? importedMeta.price : null;
-      if (!price) {
-        const manualPrice = document.getElementById("manualPrice").value;
-        price = manualPrice ? parseFloat(manualPrice) : null;
+      // v5 compatibility: coerce the string price to a number before saving.
+      let price = importedMeta ? normalizePrice(importedMeta.price) : null;
+      if (price === null) {
+        price = normalizePrice(document.getElementById("manualPrice").value);
       }
 
       if (!title) {
