@@ -577,9 +577,9 @@
         }
       );
 
-      importSourceUrl.value = parsedUrl.toString();
-
       if (error || data?.error) {
+        importSourceUrl.value = parsedUrl.toString();
+
         showError(
           importStatus,
           `Could not import product metadata: ${
@@ -592,18 +592,37 @@
         return;
       }
 
+      const finalSourceUrl = data.source_url || parsedUrl.toString();
+
+      importSourceUrl.value = finalSourceUrl;
       importName.value = data.title || "";
-      importPrice.value = data.price || "";
+      importPrice.value = data.price ?? "";
       importCurrency.value = data.currency || "";
       importImageUrl.value = data.image || "";
       importNotes.value = data.description || "";
 
       importForm.classList.remove("hidden");
 
-      if (data.price == null || data.currency == null) {
+      const hasMetadata =
+        data.metadata_found ??
+        Boolean(
+          data.title ||
+          data.description ||
+          data.image ||
+          (data.price != null && data.currency)
+        );
+
+      if (!hasMetadata) {
         showStatus(
           importStatus,
-          "Product details loaded. No reliable structured price was found, so price was left blank for your review."
+          data.warning ||
+            "The retailer did not provide usable product metadata. Enter the details manually."
+        );
+      } else if (data.price == null || data.currency == null) {
+        showStatus(
+          importStatus,
+          data.warning ||
+            "Product details loaded. No reliable structured price was found, so price was left blank for your review."
         );
       } else {
         showStatus(
