@@ -114,52 +114,93 @@
       margin: 0;
     }
     .item-list li {
-      background: #2a2a2a;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 8px;
+      background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%);
+      padding: 0;
+      border-radius: 8px;
+      margin-bottom: 12px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 12px;
+      align-items: stretch;
+      gap: 0;
+      border: 1px solid #333;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .item-content {
-      flex: 1;
-    }
-    .item-image {
-      width: 50px;
-      height: 50px;
-      object-fit: cover;
-      border-radius: 4px;
-      margin-right: 12px;
-      flex-shrink: 0;
+    .item-list li:hover {
+      border-color: #4ade80;
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.1);
     }
     .item-image-wrapper {
       display: flex;
       gap: 12px;
-      align-items: center;
+      align-items: stretch;
       width: 100%;
-    }
-    .shopping-summary {
-      background: #2a2a2a;
-      border: 1px solid #3a3a3a;
-      border-radius: 6px;
       padding: 12px;
-      margin-top: 16px;
-      text-align: center;
     }
-    .shopping-summary p {
-      margin: 0;
-      color: #aaa;
+    .item-image {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 6px;
+      flex-shrink: 0;
+      background: #0a0a0a;
     }
-    .shopping-summary .summary-highlight {
-      color: #4ade80;
-      font-weight: 600;
-      font-size: 1.1rem;
+    .item-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .item-list .item-name {
       font-weight: 600;
+      color: #e0e0e0;
+      font-size: 1rem;
+      margin: 0;
+    }
+    .item-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .category-badge {
+      display: inline-block;
+      background: #333;
+      color: #aaa;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-badge.wishlist {
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+    }
+    .status-badge.researching {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+    }
+    .status-badge.purchased {
+      background: rgba(74, 222, 128, 0.15);
+      color: #86efac;
+    }
+    .item-price {
       color: #4ade80;
+      font-weight: 600;
+      font-size: 1.05rem;
+      margin-left: auto;
     }
     .item-list .item-meta {
       font-size: 0.85rem;
@@ -170,14 +211,58 @@
       background: #ef4444;
       color: #fff;
       border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
+      padding: 12px 16px;
+      border-radius: 0;
       font-size: 0.85rem;
       cursor: pointer;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
     }
     .delete-btn:hover {
       background: #dc2626;
+    }
+    .summary-card {
+      background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .summary-card .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 12px 0;
+    }
+    .summary-card .summary-label {
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+    .summary-highlight {
+      color: #4ade80;
+      font-weight: 700;
+      font-size: 1.6rem;
+    }
+    .shopping-summary {
+      background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .shopping-summary p {
+      margin: 8px 0;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+    .shopping-summary .summary-highlight {
+      color: #4ade80;
+      font-weight: 700;
+      font-size: 1.8rem;
+      margin-top: 4px;
     }
     .preview-box {
       background: #2a2a2a;
@@ -334,7 +419,7 @@
         </div>
 
         <h2>📦 Your Gear</h2>
-        <div class="card">
+        <div id="gearListContainer" class="card">
           <ul id="gearList" class="item-list">
             <li style="color:#aaa;">Loading...</li>
           </ul>
@@ -689,23 +774,56 @@
       const list = document.getElementById("gearList");
       if (items.length === 0) {
         list.innerHTML = '<li style="color:#aaa;">No gear items yet.</li>';
+        
+        // Clear summary if no items
+        const summaryContainer = document.getElementById("gearListContainer");
+        if (summaryContainer) {
+          const existing = summaryContainer.querySelector('.summary-card');
+          if (existing) existing.remove();
+        }
         return;
       }
       list.innerHTML = items.map(item => `
         <li>
           <div class="item-image-wrapper">
-            ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : ''}
+            ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
             <div class="item-content">
               <div class="item-name">${escapeHtml(item.name)}</div>
               <div class="item-meta">
-                ${item.category}${item.brand ? " • " + escapeHtml(item.brand) : ""}
-                ${item.price ? " • €" + item.price.toFixed(2) : ""}
+                <span class="category-badge">${item.category}</span>
+                ${item.brand ? `<span style="color:#888;">${escapeHtml(item.brand)}</span>` : ''}
               </div>
             </div>
+            ${item.price ? `<div class="item-price">€${item.price.toFixed(2)}</div>` : ''}
           </div>
-          <button class="delete-btn" data-table="gear_items" data-id="${item.id}">Delete</button>
+          <button class="delete-btn" data-table="gear_items" data-id="${item.id}">×</button>
         </li>
       `).join("");
+      
+      // Calculate totals
+      const totalItems = items.length;
+      const totalPrice = items.reduce((sum, item) => sum + (item.price || 0), 0);
+      
+      // Add summary section
+      const summaryContainer = document.getElementById("gearListContainer");
+      if (summaryContainer) {
+        const existing = summaryContainer.querySelector('.summary-card');
+        if (existing) existing.remove();
+        
+        const summary = document.createElement('div');
+        summary.className = 'summary-card';
+        summary.innerHTML = `
+          <div class="summary-row">
+            <span class="summary-label">Total Items</span>
+            <span class="summary-highlight">${totalItems}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Value</span>
+            <span class="summary-highlight">€${totalPrice.toFixed(2)}</span>
+          </div>
+        `;
+        summaryContainer.appendChild(summary);
+      }
       
       // Attach delete button listeners
       document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -740,19 +858,20 @@
         }
         return;
       }
-      
       list.innerHTML = items.map(item => `
         <li>
           <div class="item-image-wrapper">
-            ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : ''}
+            ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
             <div class="item-content">
               <div class="item-name">${escapeHtml(item.name)}</div>
               <div class="item-meta">
-                ${item.category} • ${item.status}${item.estimated_cost ? " • €" + item.estimated_cost.toFixed(2) : ""}
+                <span class="category-badge">${item.category}</span>
+                <span class="status-badge ${item.status}">${item.status}</span>
               </div>
             </div>
+            ${item.estimated_cost ? `<div class="item-price">€${item.estimated_cost.toFixed(2)}</div>` : ''}
           </div>
-          <button class="delete-btn" data-table="shopping_items" data-id="${item.id}">Delete</button>
+          <button class="delete-btn" data-table="shopping_items" data-id="${item.id}">×</button>
         </li>
       `).join("");
       
@@ -769,8 +888,10 @@
         const summary = document.createElement('div');
         summary.className = 'shopping-summary';
         summary.innerHTML = `
-          <p>Items: <span class="summary-highlight">${totalItems}</span></p>
-          <p>Total: <span class="summary-highlight">€${totalCost.toFixed(2)}</span></p>
+          <div style="text-align: center;">
+            <p>Items: <span class="summary-highlight">${totalItems}</span></p>
+            <p>Total: <span class="summary-highlight">€${totalCost.toFixed(2)}</span></p>
+          </div>
         `;
         summaryContainer.appendChild(summary);
       }
