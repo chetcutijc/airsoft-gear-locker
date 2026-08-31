@@ -140,6 +140,7 @@
       border: 1px solid #333;
       overflow: hidden;
       transition: border-color 0.2s, box-shadow 0.2s;
+      cursor: pointer;
     }
     .item-list li:hover {
       border-color: #4ade80;
@@ -801,7 +802,7 @@
         return;
       }
       list.innerHTML = items.map(item => `
-        <li>
+        <li data-url="${item.source_url || ''}">
           <div class="item-image-wrapper">
             ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
             <div class="item-content">
@@ -832,9 +833,23 @@
         `;
       }
       
+      // Attach item click handlers
+      document.querySelectorAll('#gearList li').forEach(li => {
+        li.addEventListener('click', (e) => {
+          // Don't trigger if clicking the delete button
+          if (e.target.closest('.delete-btn')) return;
+          
+          const url = li.dataset.url;
+          if (url) {
+            window.open(url, '_blank');
+          }
+        });
+      });
+      
       // Attach delete button listeners
-      document.querySelectorAll('.delete-btn').forEach(btn => {
+      document.querySelectorAll('#gearList .delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
           const table = e.target.dataset.table;
           const id = e.target.dataset.id;
           if (confirm('Delete this item?')) {
@@ -863,7 +878,7 @@
         return;
       }
       list.innerHTML = items.map(item => `
-        <li>
+        <li data-url="${item.url || ''}">
           <div class="item-image-wrapper">
             ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
             <div class="item-content">
@@ -894,9 +909,23 @@
         `;
       }
       
+      // Attach item click handlers
+      document.querySelectorAll('#shoppingList li').forEach(li => {
+        li.addEventListener('click', (e) => {
+          // Don't trigger if clicking the delete button
+          if (e.target.closest('.delete-btn')) return;
+          
+          const url = li.dataset.url;
+          if (url) {
+            window.open(url, '_blank');
+          }
+        });
+      });
+      
       // Attach delete button listeners
-      document.querySelectorAll('.delete-btn').forEach(btn => {
+      document.querySelectorAll('#shoppingList .delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
           const table = e.target.dataset.table;
           const id = e.target.dataset.id;
           if (confirm('Delete this item?')) {
