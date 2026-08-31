@@ -118,6 +118,13 @@
       padding: 12px;
       border-radius: 6px;
       margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .item-content {
+      flex: 1;
     }
     .item-list .item-name {
       font-weight: 600;
@@ -127,6 +134,19 @@
       font-size: 0.85rem;
       color: #aaa;
       margin-top: 4px;
+    }
+    .delete-btn {
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .delete-btn:hover {
+      background: #dc2626;
     }
     .preview-box {
       background: #2a2a2a;
@@ -236,6 +256,7 @@
 
         <button id="saveImportBtn" disabled>Save to Gear Locker</button>
         <button class="btn-secondary" id="cancelImportBtn">Cancel</button>
+        <button class="btn-secondary" id="homeImportBtn">🏠 Home</button>
       </div>
     </div>
 
@@ -403,6 +424,28 @@
       return Number.isFinite(numeric) ? numeric : null;
     }
 
+    // Delete item from Supabase
+    async function deleteItem(table, id) {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+          },
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || "Delete failed");
+        }
+        return true;
+      } catch (err) {
+        console.error("Delete error:", err);
+        throw err;
+      }
+    }
+
     // Fetch product metadata from Edge Function
     async function fetchProductMeta(url) {
       try {
@@ -532,6 +575,10 @@
         window.history.pushState({}, "", window.location.pathname);
         location.reload();
       });
+      document.getElementById("homeImportBtn").addEventListener("click", () => {
+        window.history.pushState({}, "", window.location.pathname);
+        location.reload();
+      });
     }
 
     // Save imported item
@@ -615,13 +662,33 @@
       }
       list.innerHTML = items.map(item => `
         <li>
-          <div class="item-name">${escapeHtml(item.name)}</div>
-          <div class="item-meta">
-            ${item.category}${item.brand ? " • " + escapeHtml(item.brand) : ""}
-            ${item.price ? " • €" + item.price.toFixed(2) : ""}
+          <div class="item-content">
+            <div class="item-name">${escapeHtml(item.name)}</div>
+            <div class="item-meta">
+              ${item.category}${item.brand ? " • " + escapeHtml(item.brand) : ""}
+              ${item.price ? " • €" + item.price.toFixed(2) : ""}
+            </div>
           </div>
+          <button class="delete-btn" data-table="gear_items" data-id="${item.id}">Delete</button>
         </li>
       `).join("");
+      
+      // Attach delete button listeners
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const table = e.target.dataset.table;
+          const id = e.target.dataset.id;
+          if (confirm('Delete this item?')) {
+            try {
+              await deleteItem(table, id);
+              showSuccess('Item deleted');
+              loadGearItems();
+            } catch (err) {
+              showError('Failed to delete: ' + err.message);
+            }
+          }
+        });
+      });
     }
 
     // Load shopping items
@@ -634,12 +701,32 @@
       }
       list.innerHTML = items.map(item => `
         <li>
-          <div class="item-name">${escapeHtml(item.name)}</div>
-          <div class="item-meta">
-            ${item.category} • ${item.status}${item.estimated_cost ? " • €" + item.estimated_cost.toFixed(2) : ""}
+          <div class="item-content">
+            <div class="item-name">${escapeHtml(item.name)}</div>
+            <div class="item-meta">
+              ${item.category} • ${item.status}${item.estimated_cost ? " • €" + item.estimated_cost.toFixed(2) : ""}
+            </div>
           </div>
+          <button class="delete-btn" data-table="shopping_items" data-id="${item.id}">Delete</button>
         </li>
       `).join("");
+      
+      // Attach delete button listeners
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const table = e.target.dataset.table;
+          const id = e.target.dataset.id;
+          if (confirm('Delete this item?')) {
+            try {
+              await deleteItem(table, id);
+              showSuccess('Item deleted');
+              loadShoppingItems();
+            } catch (err) {
+              showError('Failed to delete: ' + err.message);
+            }
+          }
+        });
+      });
     }
 
     // Escape HTML
