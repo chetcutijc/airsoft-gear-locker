@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+l<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -338,6 +338,22 @@
       color: #0a0a0a;
       border-color: #4ade80;
     }
+    .import-type-btn {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      color: #aaa;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .import-type-btn:hover {
+      border-color: #4ade80;
+    }
+    .import-type-btn-active {
+      background: #4ade80;
+      color: #0a0a0a;
+      border-color: #4ade80;
+    }
     .event-item {
       background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%);
       border: 1px solid #333;
@@ -432,6 +448,14 @@
           <div class="classification-btn" data-class="owned">Owned</div>
           <div class="classification-btn" data-class="shopping">Shopping</div>
           <div class="classification-btn" data-class="researching">Researching</div>
+        </div>
+
+        <div id="importShoppingTypeGroup" class="hidden" style="margin-bottom:16px;">
+          <p style="margin:0 0 8px;font-size:0.9rem;color:#aaa;"><strong>Add to:</strong></p>
+          <div style="display:flex;gap:8px;">
+            <button class="import-type-btn import-type-btn-active" data-type="researching" style="flex:1;padding:8px;">📋 Need to Buy</button>
+            <button class="import-type-btn" data-type="wishlist" style="flex:1;padding:8px;">⭐ Wishlist</button>
+          </div>
         </div>
 
         <div class="form-group">
@@ -649,6 +673,7 @@
     let importedUrl = "";
     let importedMeta = null;
     let selectedShoppingType = "researching"; // "researching" = Need to Buy, "wishlist" = Wishlist
+    let selectedImportShoppingType = "researching"; // For URL import flow
 
     // Utility functions
     function showError(msg) {
@@ -825,6 +850,23 @@
           btn.classList.add("selected");
           selectedClassification = btn.dataset.class;
           document.getElementById("saveImportBtn").disabled = false;
+          
+          // Show shopping type selection only for "shopping" classification
+          const shoppingTypeGroup = document.getElementById("importShoppingTypeGroup");
+          if (btn.dataset.class === "shopping") {
+            shoppingTypeGroup.classList.remove("hidden");
+          } else {
+            shoppingTypeGroup.classList.add("hidden");
+          }
+        });
+      });
+
+      // Import shopping type buttons
+      document.querySelectorAll(".import-type-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".import-type-btn").forEach(b => b.classList.remove("import-type-btn-active"));
+          btn.classList.add("import-type-btn-active");
+          selectedImportShoppingType = btn.dataset.type;
         });
       });
 
@@ -886,7 +928,12 @@
           showSuccess("✅ Gear item saved!");
         } else {
           // Save to shopping_items
-          const status = selectedClassification === "shopping" ? "wishlist" : "researching";
+          let status;
+          if (selectedClassification === "shopping") {
+            status = selectedImportShoppingType; // Use the selected type (researching or wishlist)
+          } else {
+            status = "researching"; // For "researching" classification
+          }
           const shopData = {
             ...commonData,
             name: title,
