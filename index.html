@@ -1,4 +1,4 @@
-l<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -146,6 +146,9 @@ l<!DOCTYPE html>
       border-color: #4ade80;
       box-shadow: 0 0 12px rgba(74, 222, 128, 0.1);
     }
+    .item-list li.purchased-item {
+      opacity: 0.7;
+    }
     .item-image-wrapper {
       display: flex;
       gap: 12px;
@@ -223,9 +226,15 @@ l<!DOCTYPE html>
       color: #aaa;
       margin-top: 4px;
     }
-    .delete-btn {
-      background: #ef4444;
-      color: #fff;
+    .item-actions {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 8px 8px 0;
+      flex-shrink: 0;
+    }
+    .delete-btn, .purchase-btn {
       border: none;
       padding: 8px 12px;
       border-radius: 4px;
@@ -240,10 +249,22 @@ l<!DOCTYPE html>
       min-width: 36px;
       height: 36px;
       line-height: 1;
-      margin-left: 8px;
+      margin: 0;
+    }
+    .delete-btn {
+      background: #ef4444;
+      color: #fff;
     }
     .delete-btn:hover {
       background: #dc2626;
+    }
+    .purchase-btn {
+      background: #4ade80;
+      color: #0a0a0a;
+      font-weight: 700;
+    }
+    .purchase-btn:hover {
+      background: #22c55e;
     }
     .summary-card {
       background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%);
@@ -606,6 +627,13 @@ l<!DOCTYPE html>
             <li style="color:#aaa;">Loading...</li>
           </ul>
         </div>
+
+        <h2>✅ Purchased <span id="purchasedSummary"></span></h2>
+        <div id="purchasedContainer" class="card">
+          <ul id="purchasedList" class="item-list">
+            <li style="color:#aaa;">Loading...</li>
+          </ul>
+        </div>
       </div>
 
       <!-- Sessions Tab -->
@@ -668,12 +696,17 @@ l<!DOCTYPE html>
     const SUPABASE_URL = "https://jcheoqzbkfavjwuyesku.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjaGVvcXpia2Zhdmp3dXllc2t1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMTcxMzMsImV4cCI6MjEwMzY5MzEzM30.i6Ezt82JNQelXMh06n7GXgVa4esPTqd8AMlj2mTVuyM";
 
+    // gear_items has a CHECK constraint limited to these categories.
+    // Shopping-only categories (battery, optic) are mapped to "accessory" when moved to Gear.
+    const GEAR_CATEGORIES = ["replica", "magazine", "holster", "eye_protection", "face_protection", "gas", "bbs", "accessory", "other"];
+
     // State
     let selectedClassification = null;
     let importedUrl = "";
     let importedMeta = null;
     let selectedShoppingType = "researching"; // "researching" = Need to Buy, "wishlist" = Wishlist
     let selectedImportShoppingType = "researching"; // For URL import flow
+    let shoppingCache = {}; // id -> shopping item, used by the purchase button
 
     // Utility functions
     function showError(msg) {
@@ -708,6 +741,17 @@ l<!DOCTYPE html>
       return Number.isFinite(numeric) ? numeric : null;
     }
 
+    // Today's date in local time as YYYY-MM-DD (for date columns)
+    function todayLocal() {
+      return new Date().toLocaleDateString("en-CA");
+    }
+
+    function formatShortDate(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr + "T00:00:00");
+      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    }
+
     // Delete item from Supabase
     async function deleteItem(table, id) {
       try {
@@ -728,6 +772,26 @@ l<!DOCTYPE html>
         console.error("Delete error:", err);
         throw err;
       }
+    }
+
+    // Update (PATCH) an item in Supabase
+    async function updateItem(table, id, data) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "apikey": SUPABASE_ANON_KEY,
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ ...data, updated_at: new Date().toISOString() }),
+      });
+      if (!response.ok) {
+        let message = "Update failed";
+        try { message = (await response.json()).message || message; } catch (_) {}
+        throw new Error(message);
+      }
+      return true;
     }
 
     // Fetch product metadata from Edge Function
@@ -762,6 +826,9 @@ l<!DOCTYPE html>
             "Content-Type": "application/json",
             "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
             "apikey": SUPABASE_ANON_KEY,
+            // Without this, PostgREST returns an empty body and response.json() throws
+            // even though the row was saved.
+            "Prefer": "return=representation",
           },
           body: JSON.stringify(data),
         });
@@ -778,9 +845,9 @@ l<!DOCTYPE html>
     }
 
     // Load items from Supabase
-    async function loadItems(table) {
+    async function loadItems(table, query = "order=created_at.desc&limit=50") {
       try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.desc&limit=50`, {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&${query}`, {
           headers: {
             "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
             "apikey": SUPABASE_ANON_KEY,
@@ -850,7 +917,7 @@ l<!DOCTYPE html>
           btn.classList.add("selected");
           selectedClassification = btn.dataset.class;
           document.getElementById("saveImportBtn").disabled = false;
-          
+
           // Show shopping type selection only for "shopping" classification
           const shoppingTypeGroup = document.getElementById("importShoppingTypeGroup");
           if (btn.dataset.class === "shopping") {
@@ -964,13 +1031,15 @@ l<!DOCTYPE html>
       const list = document.getElementById("gearList");
       if (items.length === 0) {
         list.innerHTML = '<li style="color:#aaa;">No gear items yet.</li>';
-        
+
         // Clear summary
         const summaryEl = document.getElementById("gearSummary");
         if (summaryEl) summaryEl.innerHTML = '';
         return;
       }
-      list.innerHTML = items.map(item => `
+      list.innerHTML = items.map(item => {
+        const price = normalizePrice(item.price);
+        return `
         <li data-url="${item.source_url || ''}">
           <div class="item-image-wrapper">
             ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
@@ -981,49 +1050,50 @@ l<!DOCTYPE html>
                 ${item.brand ? `<span style="color:#888;">${escapeHtml(item.brand)}</span>` : ''}
               </div>
             </div>
-            ${item.price ? `<div class="item-price">€${item.price.toFixed(2)}</div>` : ''}
+            ${price ? `<div class="item-price">€${price.toFixed(2)}</div>` : ''}
           </div>
-          <button class="delete-btn" data-table="gear_items" data-id="${item.id}">×</button>
+          <div class="item-actions">
+            <button class="delete-btn" data-table="gear_items" data-id="${item.id}">×</button>
+          </div>
         </li>
-      `).join("");
-      
+      `;
+      }).join("");
+
       // Calculate totals
       const totalItems = items.length;
-      const totalPrice = items.reduce((sum, item) => sum + (item.price || 0), 0);
-      
+      const totalPrice = items.reduce((sum, item) => sum + (normalizePrice(item.price) || 0), 0);
+
       // Update header summary
       const summaryEl = document.getElementById("gearSummary");
       if (summaryEl) {
         summaryEl.innerHTML = `
           <div class="header-summary">
-            ${totalItems} item${totalItems !== 1 ? 's' : ''} · 
+            ${totalItems} item${totalItems !== 1 ? 's' : ''} ·
             <span class="header-summary-value">€${totalPrice.toFixed(2)}</span>
           </div>
         `;
       }
-      
+
       // Attach item click handlers
       document.querySelectorAll('#gearList li').forEach(li => {
         li.addEventListener('click', (e) => {
-          // Don't trigger if clicking the delete button
-          if (e.target.closest('.delete-btn')) return;
-          
+          // Don't trigger if clicking a button
+          if (e.target.closest('button')) return;
+
           const url = li.dataset.url;
           if (url) {
             window.open(url, '_blank');
           }
         });
       });
-      
+
       // Attach delete button listeners
       document.querySelectorAll('#gearList .delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const table = e.target.dataset.table;
-          const id = e.target.dataset.id;
           if (confirm('Delete this item?')) {
             try {
-              await deleteItem(table, id);
+              await deleteItem(btn.dataset.table, btn.dataset.id);
               showSuccess('Item deleted');
               loadGearItems();
             } catch (err) {
@@ -1034,88 +1104,124 @@ l<!DOCTYPE html>
       });
     }
 
+    // Render one shopping/wishlist/purchased card
+    function renderShopCard(item, purchased = false) {
+      const price = normalizePrice(item.estimated_cost);
+      return `
+        <li data-url="${item.url || ''}"${purchased ? ' class="purchased-item"' : ''}>
+          <div class="item-image-wrapper">
+            ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
+            <div class="item-content">
+              <div class="item-name">${escapeHtml(item.name)}</div>
+              <div class="item-meta">
+                <span class="category-badge">${item.category}</span>
+                ${purchased && item.purchased_on ? `<span class="status-badge purchased">${formatShortDate(item.purchased_on)}</span>` : ''}
+              </div>
+            </div>
+            ${price ? `<div class="item-price">€${price.toFixed(2)}</div>` : ''}
+          </div>
+          <div class="item-actions">
+            ${purchased ? '' : `<button class="purchase-btn" data-id="${item.id}" title="Mark as purchased">✓</button>`}
+            <button class="delete-btn" data-table="shopping_items" data-id="${item.id}" title="Delete">×</button>
+          </div>
+        </li>
+      `;
+    }
+
+    // Render a list section plus its header summary
+    function renderShopSection(listId, summaryId, items, emptyText, purchased = false) {
+      const list = document.getElementById(listId);
+      const summaryEl = document.getElementById(summaryId);
+      if (items.length === 0) {
+        list.innerHTML = `<li style="color:#aaa;">${emptyText}</li>`;
+        summaryEl.innerHTML = '';
+        return;
+      }
+      list.innerHTML = items.map(item => renderShopCard(item, purchased)).join("");
+      const total = items.reduce((sum, item) => sum + (normalizePrice(item.estimated_cost) || 0), 0);
+      summaryEl.innerHTML = `
+        <div class="header-summary">
+          ${items.length} item${items.length !== 1 ? 's' : ''} ·
+          <span class="header-summary-value">€${total.toFixed(2)}</span>
+        </div>
+      `;
+    }
+
+    // Mark a shopping/wishlist item as purchased, optionally copying it into Gear
+    async function markPurchased(item) {
+      if (!confirm(`Mark "${item.name}" as purchased?`)) return;
+      const addToGear = confirm("Also add it to your Gear?\n\nOK = add to Gear\nCancel = only mark as purchased");
+      const today = todayLocal();
+      let gearSaved = false;
+
+      try {
+        if (addToGear) {
+          await saveToSupabase("gear_items", {
+            name: item.name,
+            category: GEAR_CATEGORIES.includes(item.category) ? item.category : "accessory",
+            notes: item.notes || item.reason || null,
+            price: normalizePrice(item.estimated_cost ?? item.price),
+            acquired_on: today,
+            source_url: item.source_url || item.url || null,
+            source_title: item.source_title || null,
+            source_image_url: item.source_image_url || null,
+          });
+          gearSaved = true;
+        }
+
+        await updateItem("shopping_items", item.id, { purchased: true, purchased_on: today });
+
+        showSuccess(addToGear ? "✅ Purchased and added to Gear" : "✅ Marked as purchased");
+        loadShoppingItems();
+        if (addToGear) loadGearItems();
+      } catch (err) {
+        if (gearSaved) {
+          showError("Added to Gear, but couldn't mark the shopping item as purchased: " + err.message);
+          loadGearItems();
+        } else {
+          showError("Failed to mark as purchased: " + err.message);
+        }
+      }
+    }
+
     // Load shopping items
     async function loadShoppingItems() {
-      const items = await loadItems("shopping_items");
-      
-      // Split items by status
-      const shoppingItems = items.filter(item => item.status === "researching");
-      const wishlistItems = items.filter(item => item.status === "wishlist");
-      
-      // Render shopping list (Need to Buy)
-      const shoppingList = document.getElementById("shoppingList");
-      if (shoppingItems.length === 0) {
-        shoppingList.innerHTML = '<li style="color:#aaa;">No items to buy yet.</li>';
-        document.getElementById("shoppingListSummary").innerHTML = '';
-      } else {
-        shoppingList.innerHTML = shoppingItems.map(item => `
-          <li data-url="${item.url || ''}">
-            <div class="item-image-wrapper">
-              ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
-              <div class="item-content">
-                <div class="item-name">${escapeHtml(item.name)}</div>
-                <div class="item-meta">
-                  <span class="category-badge">${item.category}</span>
-                </div>
-              </div>
-              ${item.estimated_cost ? `<div class="item-price">€${item.estimated_cost.toFixed(2)}</div>` : ''}
-            </div>
-            <button class="delete-btn" data-table="shopping_items" data-id="${item.id}">×</button>
-          </li>
-        `).join("");
-        
-        const totalShopping = shoppingItems.length;
-        const totalShoppingCost = shoppingItems.reduce((sum, item) => sum + (item.estimated_cost || 0), 0);
-        document.getElementById("shoppingListSummary").innerHTML = `
-          <div class="header-summary">
-            ${totalShopping} item${totalShopping !== 1 ? 's' : ''} · 
-            <span class="header-summary-value">€${totalShoppingCost.toFixed(2)}</span>
-          </div>
-        `;
-      }
-      
-      // Render wishlist
-      const wishlist = document.getElementById("wishlist");
-      if (wishlistItems.length === 0) {
-        wishlist.innerHTML = '<li style="color:#aaa;">No wishlist items yet.</li>';
-        document.getElementById("wishlistSummary").innerHTML = '';
-      } else {
-        wishlist.innerHTML = wishlistItems.map(item => `
-          <li data-url="${item.url || ''}">
-            <div class="item-image-wrapper">
-              ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
-              <div class="item-content">
-                <div class="item-name">${escapeHtml(item.name)}</div>
-                <div class="item-meta">
-                  <span class="category-badge">${item.category}</span>
-                </div>
-              </div>
-              ${item.estimated_cost ? `<div class="item-price">€${item.estimated_cost.toFixed(2)}</div>` : ''}
-            </div>
-            <button class="delete-btn" data-table="shopping_items" data-id="${item.id}">×</button>
-          </li>
-        `).join("");
-        
-        const totalWishlist = wishlistItems.length;
-        const totalWishlistCost = wishlistItems.reduce((sum, item) => sum + (item.estimated_cost || 0), 0);
-        document.getElementById("wishlistSummary").innerHTML = `
-          <div class="header-summary">
-            ${totalWishlist} item${totalWishlist !== 1 ? 's' : ''} · 
-            <span class="header-summary-value">€${totalWishlistCost.toFixed(2)}</span>
-          </div>
-        `;
-      }
-      
-      // Attach click handlers to both lists
-      ['shoppingList', 'wishlist'].forEach(listId => {
+      // Load active and purchased separately so purchased history never
+      // pushes active items out of the result limit.
+      const [activeItems, purchasedItems] = await Promise.all([
+        loadItems("shopping_items", "purchased=eq.false&order=created_at.desc&limit=100"),
+        loadItems("shopping_items", "purchased=eq.true&order=purchased_on.desc.nullslast&limit=20"),
+      ]);
+
+      shoppingCache = {};
+      [...activeItems, ...purchasedItems].forEach(item => { shoppingCache[item.id] = item; });
+
+      const shoppingItems = activeItems.filter(item => item.status === "researching");
+      const wishlistItems = activeItems.filter(item => item.status === "wishlist");
+
+      renderShopSection("shoppingList", "shoppingListSummary", shoppingItems, "No items to buy yet.");
+      renderShopSection("wishlist", "wishlistSummary", wishlistItems, "No wishlist items yet.");
+      renderShopSection("purchasedList", "purchasedSummary", purchasedItems, "Nothing purchased yet.", true);
+
+      ['shoppingList', 'wishlist', 'purchasedList'].forEach(listId => {
+        // Open product link when the card (not a button) is tapped
         document.querySelectorAll(`#${listId} li`).forEach(li => {
           li.addEventListener('click', (e) => {
-            if (e.target.closest('.delete-btn')) return;
+            if (e.target.closest('button')) return;
             const url = li.dataset.url;
             if (url) window.open(url, '_blank');
           });
         });
-        
+
+        // Purchase handlers
+        document.querySelectorAll(`#${listId} .purchase-btn`).forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const item = shoppingCache[btn.dataset.id];
+            if (item) markPurchased(item);
+          });
+        });
+
         // Delete handlers
         document.querySelectorAll(`#${listId} .delete-btn`).forEach(btn => {
           btn.addEventListener('click', async (e) => {
@@ -1253,15 +1359,15 @@ l<!DOCTYPE html>
       async function loadEvents() {
         const events = await loadItems("airsoft_events");
         const list = document.getElementById("eventsList");
-        
+
         if (events.length === 0) {
           list.innerHTML = '<li style="color:#aaa;padding:20px;text-align:center;">No upcoming events.</li>';
           return;
         }
-        
+
         // Sort by date
         events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
-        
+
         list.innerHTML = events.map(event => {
           const date = new Date(event.event_date);
           const dateStr = date.toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -1273,7 +1379,7 @@ l<!DOCTYPE html>
             'cleaning': '🧹',
             'other': '📝'
           }[event.event_type] || '📝';
-          
+
           return `
             <li class="event-item">
               <div class="event-date">${dateStr}${event.event_date.includes('T') ? ` · ${timeStr}` : ''}</div>
@@ -1285,7 +1391,7 @@ l<!DOCTYPE html>
             </li>
           `;
         }).join("");
-        
+
         // Delete handlers
         document.querySelectorAll('.event-delete-btn').forEach(btn => {
           btn.addEventListener('click', async (e) => {
