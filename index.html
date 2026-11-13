@@ -169,6 +169,7 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      min-width: 0;
     }
     .item-list .item-name {
       font-weight: 600;
@@ -220,6 +221,7 @@
       font-weight: 600;
       font-size: 1.05rem;
       margin-left: auto;
+      white-space: nowrap;
     }
     .item-list .item-meta {
       font-size: 0.85rem;
@@ -427,6 +429,89 @@
     .event-delete-btn:hover {
       background: #dc2626;
     }
+
+    /* --- Quantity + grouping --- */
+    .qty-stepper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .qty-btn {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #e0e0e0;
+      width: 30px;
+      height: 30px;
+      min-width: 30px;
+      padding: 0;
+      margin: 0;
+      border-radius: 6px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .qty-btn:hover:not(:disabled) {
+      border-color: #4ade80;
+      color: #4ade80;
+    }
+    .qty-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .qty-value {
+      min-width: 26px;
+      text-align: center;
+      font-weight: 700;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+    }
+    .qty-unit {
+      color: #888;
+      font-size: 0.78rem;
+    }
+    .out-badge {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .item-list li.out-of-stock {
+      opacity: 0.55;
+    }
+    .gear-child {
+      margin-left: 22px !important;
+      border-left: 3px solid #4ade80 !important;
+    }
+    .group-hint {
+      color: #4ade80;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .parent-select {
+      margin-top: 8px;
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 5px;
+      color: #999;
+      width: auto;
+      max-width: 100%;
+    }
+    .parent-select:focus {
+      border-color: #4ade80;
+      color: #e0e0e0;
+    }
   </style>
 </head>
 <body>
@@ -494,6 +579,19 @@
           </select>
         </div>
 
+        <div id="importOwnedExtras" class="hidden">
+          <div class="form-group">
+            <label for="importQuantity">Quantity</label>
+            <input type="number" id="importQuantity" min="0" step="1" value="1" />
+          </div>
+          <div class="form-group">
+            <label for="importParent">Part of (optional)</label>
+            <select id="importParent">
+              <option value="">— Standalone item —</option>
+            </select>
+          </div>
+        </div>
+
         <div class="form-group">
           <label for="importBrand">Brand (optional)</label>
           <input type="text" id="importBrand" placeholder="Brand name" />
@@ -540,6 +638,20 @@
               <option value="accessory">Accessory</option>
               <option value="other">Other</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label for="gearQuantity">Quantity</label>
+            <input type="number" id="gearQuantity" min="0" step="1" value="1" />
+          </div>
+          <div class="form-group">
+            <label for="gearParent">Part of (optional)</label>
+            <select id="gearParent">
+              <option value="">— Standalone item —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="gearPrice">Price each (optional)</label>
+            <input type="number" id="gearPrice" step="0.01" placeholder="0.00" />
           </div>
           <div class="form-group">
             <label for="gearBrand">Brand (optional)</label>
@@ -707,6 +819,7 @@
     let selectedShoppingType = "researching"; // "researching" = Need to Buy, "wishlist" = Wishlist
     let selectedImportShoppingType = "researching"; // For URL import flow
     let shoppingCache = {}; // id -> shopping item, used by the purchase button
+    let gearCache = [];     // last loaded gear_items, used by stepper + parent pickers
 
     // Utility functions
     function showError(msg) {
@@ -739,6 +852,13 @@
       }
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    // Quantity defaults to 1 for any row written before the column existed.
+    function normalizeQuantity(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric < 0) return 1;
+      return Math.floor(numeric);
     }
 
     // Today's date in local time as YYYY-MM-DD (for date columns)
@@ -879,6 +999,9 @@
       importedUrl = url;
       document.getElementById("importFlow").classList.remove("hidden");
 
+      // Parent options for the "Owned" path are needed before the user picks it
+      loadGearItems({ renderList: false });
+
       // Fetch metadata
       const meta = await fetchProductMeta(url);
       document.getElementById("loadingPreview").classList.add("hidden");
@@ -924,6 +1047,14 @@
             shoppingTypeGroup.classList.remove("hidden");
           } else {
             shoppingTypeGroup.classList.add("hidden");
+          }
+
+          // Quantity + parent only apply to owned gear
+          const ownedExtras = document.getElementById("importOwnedExtras");
+          if (btn.dataset.class === "owned") {
+            ownedExtras.classList.remove("hidden");
+          } else {
+            ownedExtras.classList.add("hidden");
           }
         });
       });
@@ -990,6 +1121,8 @@
             category,
             brand: brand || null,
             notes: notes || null,
+            quantity: normalizeQuantity(document.getElementById("importQuantity").value),
+            parent_id: document.getElementById("importParent").value || null,
           };
           await saveToSupabase("gear_items", gearData);
           showSuccess("✅ Gear item saved!");
@@ -1025,73 +1158,209 @@
       }
     }
 
-    // Load gear items
-    async function loadGearItems() {
-      const items = await loadItems("gear_items");
-      const list = document.getElementById("gearList");
-      if (items.length === 0) {
-        list.innerHTML = '<li style="color:#aaa;">No gear items yet.</li>';
+    // --- Quantity + grouping helpers -------------------------------------
 
-        // Clear summary
-        const summaryEl = document.getElementById("gearSummary");
-        if (summaryEl) summaryEl.innerHTML = '';
-        return;
+    // Change an item's quantity by delta, never below zero.
+    async function changeQuantity(id, delta, buttonEl) {
+      const item = gearCache.find(i => i.id === id);
+      if (!item) return;
+      const next = Math.max(0, normalizeQuantity(item.quantity) + delta);
+      if (next === normalizeQuantity(item.quantity)) return;
+
+      if (buttonEl) buttonEl.disabled = true;
+      try {
+        await updateItem("gear_items", id, { quantity: next });
+        item.quantity = next; // keep the cache honest until the reload lands
+        await loadGearItems();
+      } catch (err) {
+        showError("Could not update quantity: " + err.message);
+        if (buttonEl) buttonEl.disabled = false;
       }
-      list.innerHTML = items.map(item => {
-        const price = normalizePrice(item.price);
-        return `
-        <li data-url="${item.source_url || ''}">
+    }
+
+    // Attach or detach an item from a parent device.
+    async function changeParent(id, parentId) {
+      try {
+        await updateItem("gear_items", id, { parent_id: parentId || null });
+        showSuccess(parentId ? "✅ Grouped" : "✅ Ungrouped");
+        await loadGearItems();
+      } catch (err) {
+        showError("Could not regroup: " + err.message);
+        loadGearItems();
+      }
+    }
+
+    // Fill the "Part of" dropdowns on the add forms with current top-level items.
+    function populateParentPickers() {
+      const candidates = gearCache.filter(i => !i.parent_id);
+      const optionsHtml = '<option value="">— Standalone item —</option>' +
+        candidates.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+
+      ["gearParent", "importParent"].forEach(selectId => {
+        const el = document.getElementById(selectId);
+        if (!el) return;
+        const previous = el.value;
+        el.innerHTML = optionsHtml;
+        if (previous && candidates.some(c => c.id === previous)) {
+          el.value = previous;
+        }
+      });
+    }
+
+    // One gear card. `isChild` indents it under its parent; `childCount` > 0
+    // means it is a parent device and cannot itself be nested.
+    function renderGearCard(item, isChild, childCount, parentCandidates) {
+      const qty = normalizeQuantity(item.quantity);
+      const unit = normalizePrice(item.price);
+      const lineTotal = unit !== null ? unit * qty : null;
+
+      const classes = [];
+      if (isChild) classes.push("gear-child");
+      if (qty === 0) classes.push("out-of-stock");
+
+      const image = item.source_image_url
+        ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />`
+        : '<div class="item-image" style="background:#333;"></div>';
+
+      // Only leaf items get a parent picker, which keeps grouping one level deep.
+      let parentPicker = "";
+      if (childCount === 0) {
+        const opts = parentCandidates
+          .filter(c => c.id !== item.id)
+          .map(c => `<option value="${c.id}"${c.id === item.parent_id ? " selected" : ""}>${escapeHtml(c.name)}</option>`)
+          .join("");
+        parentPicker = `<select class="parent-select" data-id="${item.id}">
+              <option value=""${!item.parent_id ? " selected" : ""}>— standalone —</option>${opts}
+            </select>`;
+      }
+
+      return `
+        <li data-url="${item.source_url || ''}"${classes.length ? ` class="${classes.join(' ')}"` : ''}>
           <div class="item-image-wrapper">
-            ${item.source_image_url ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />` : '<div class="item-image" style="background:#333;"></div>'}
+            ${image}
             <div class="item-content">
               <div class="item-name">${escapeHtml(item.name)}</div>
               <div class="item-meta">
                 <span class="category-badge">${item.category}</span>
                 ${item.brand ? `<span style="color:#888;">${escapeHtml(item.brand)}</span>` : ''}
+                ${childCount > 0 ? `<span class="group-hint">▾ ${childCount} attached</span>` : ''}
               </div>
+              <div class="qty-stepper">
+                <button class="qty-btn" data-id="${item.id}" data-delta="-1" title="Decrease"${qty === 0 ? ' disabled' : ''}>−</button>
+                <span class="qty-value">${qty}</span>
+                <button class="qty-btn" data-id="${item.id}" data-delta="1" title="Increase">+</button>
+                ${qty > 1 && unit !== null ? `<span class="qty-unit">€${unit.toFixed(2)} each</span>` : ''}
+                ${qty === 0 ? '<span class="out-badge">out</span>' : ''}
+              </div>
+              ${parentPicker}
             </div>
-            ${price ? `<div class="item-price">€${price.toFixed(2)}</div>` : ''}
+            ${lineTotal !== null ? `<div class="item-price">€${lineTotal.toFixed(2)}</div>` : ''}
           </div>
           <div class="item-actions">
-            <button class="delete-btn" data-table="gear_items" data-id="${item.id}">×</button>
+            <button class="delete-btn" data-table="gear_items" data-id="${item.id}" data-children="${childCount}">×</button>
           </div>
         </li>
       `;
-      }).join("");
+    }
 
-      // Calculate totals
-      const totalItems = items.length;
-      const totalPrice = items.reduce((sum, item) => sum + (normalizePrice(item.price) || 0), 0);
+    // Load gear items
+    async function loadGearItems(options = {}) {
+      const { renderList = true } = options;
 
-      // Update header summary
+      // Limit raised from the default 50: accessories are rows too, and a child
+      // falling outside the window would silently vanish from under its parent.
+      const items = await loadItems("gear_items", "order=created_at.desc&limit=300");
+      gearCache = items;
+      populateParentPickers();
+
+      if (!renderList) return;
+
+      const list = document.getElementById("gearList");
       const summaryEl = document.getElementById("gearSummary");
+
+      if (items.length === 0) {
+        list.innerHTML = '<li style="color:#aaa;">No gear items yet.</li>';
+        if (summaryEl) summaryEl.innerHTML = '';
+        return;
+      }
+
+      // Build the parent -> children map
+      const byId = new Map(items.map(i => [i.id, i]));
+      const childrenOf = new Map();
+      items.forEach(i => {
+        if (i.parent_id && byId.has(i.parent_id)) {
+          if (!childrenOf.has(i.parent_id)) childrenOf.set(i.parent_id, []);
+          childrenOf.get(i.parent_id).push(i);
+        }
+      });
+
+      // An item whose parent is missing from this page is shown at top level
+      // rather than disappearing.
+      const topLevel = items.filter(i => !i.parent_id || !byId.has(i.parent_id));
+      const parentCandidates = items.filter(i => !i.parent_id);
+
+      const html = [];
+      topLevel.forEach(parent => {
+        const children = childrenOf.get(parent.id) || [];
+        html.push(renderGearCard(parent, false, children.length, parentCandidates));
+        children.forEach(child => {
+          html.push(renderGearCard(child, true, (childrenOf.get(child.id) || []).length, parentCandidates));
+        });
+      });
+      list.innerHTML = html.join("");
+
+      // Totals now account for quantity.
+      const totalUnits = items.reduce((sum, i) => sum + normalizeQuantity(i.quantity), 0);
+      const totalPrice = items.reduce(
+        (sum, i) => sum + (normalizePrice(i.price) || 0) * normalizeQuantity(i.quantity),
+        0
+      );
+
       if (summaryEl) {
         summaryEl.innerHTML = `
           <div class="header-summary">
-            ${totalItems} item${totalItems !== 1 ? 's' : ''} ·
+            ${items.length} entr${items.length !== 1 ? 'ies' : 'y'}${totalUnits !== items.length ? ` · ${totalUnits} units` : ''} ·
             <span class="header-summary-value">€${totalPrice.toFixed(2)}</span>
           </div>
         `;
       }
 
-      // Attach item click handlers
+      // Card tap opens the product link. Steppers and the parent picker are
+      // interactive controls, so they must not trigger it.
       document.querySelectorAll('#gearList li').forEach(li => {
         li.addEventListener('click', (e) => {
-          // Don't trigger if clicking a button
-          if (e.target.closest('button')) return;
-
+          if (e.target.closest('button, select, input, option')) return;
           const url = li.dataset.url;
-          if (url) {
-            window.open(url, '_blank');
-          }
+          if (url) window.open(url, '_blank');
         });
       });
 
-      // Attach delete button listeners
+      // Quantity steppers
+      document.querySelectorAll('#gearList .qty-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          changeQuantity(btn.dataset.id, Number(btn.dataset.delta), btn);
+        });
+      });
+
+      // Parent pickers
+      document.querySelectorAll('#gearList .parent-select').forEach(sel => {
+        sel.addEventListener('click', (e) => e.stopPropagation());
+        sel.addEventListener('change', (e) => {
+          e.stopPropagation();
+          changeParent(sel.dataset.id, sel.value);
+        });
+      });
+
+      // Delete
       document.querySelectorAll('#gearList .delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (confirm('Delete this item?')) {
+          const childCount = Number(btn.dataset.children || 0);
+          const message = childCount > 0
+            ? `Delete this item?\n\nIts ${childCount} attached item${childCount !== 1 ? 's' : ''} will be kept, but will become standalone.`
+            : 'Delete this item?';
+          if (confirm(message)) {
             try {
               await deleteItem(btn.dataset.table, btn.dataset.id);
               showSuccess('Item deleted');
@@ -1161,6 +1430,7 @@
             category: GEAR_CATEGORIES.includes(item.category) ? item.category : "accessory",
             notes: item.notes || item.reason || null,
             price: normalizePrice(item.estimated_cost ?? item.price),
+            quantity: 1,
             acquired_on: today,
             source_url: item.source_url || item.url || null,
             source_title: item.source_title || null,
@@ -1204,10 +1474,10 @@
       renderShopSection("purchasedList", "purchasedSummary", purchasedItems, "Nothing purchased yet.", true);
 
       ['shoppingList', 'wishlist', 'purchasedList'].forEach(listId => {
-        // Open product link when the card (not a button) is tapped
+        // Open product link when the card (not a control) is tapped
         document.querySelectorAll(`#${listId} li`).forEach(li => {
           li.addEventListener('click', (e) => {
-            if (e.target.closest('button')) return;
+            if (e.target.closest('button, select, input, option')) return;
             const url = li.dataset.url;
             if (url) window.open(url, '_blank');
           });
@@ -1273,6 +1543,9 @@
           category: document.getElementById("gearCategory").value,
           brand: document.getElementById("gearBrand").value.trim() || null,
           notes: document.getElementById("gearNotes").value.trim() || null,
+          quantity: normalizeQuantity(document.getElementById("gearQuantity").value),
+          parent_id: document.getElementById("gearParent").value || null,
+          price: normalizePrice(document.getElementById("gearPrice").value),
         };
         try {
           await saveToSupabase("gear_items", gearData);
@@ -1280,6 +1553,9 @@
           document.getElementById("gearName").value = "";
           document.getElementById("gearBrand").value = "";
           document.getElementById("gearNotes").value = "";
+          document.getElementById("gearPrice").value = "";
+          document.getElementById("gearQuantity").value = "1";
+          document.getElementById("gearParent").value = "";
           loadGearItems();
         } catch (err) {
           showError("Failed to save: " + err.message);
