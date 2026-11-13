@@ -536,6 +536,99 @@
     .item-list li.collapsed {
       display: none !important;
     }
+
+    /* --- Collections (type sections) --- */
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin: 18px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #2d2d2d;
+    }
+    .section-head:first-child { margin-top: 0; }
+    .section-title {
+      color: #4ade80;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .section-title.untyped { color: #777; }
+    .section-stats {
+      color: #888;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    .section-stats strong { color: #4ade80; font-weight: 600; }
+    .collection-select {
+      margin-top: 8px;
+      margin-right: 6px;
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 5px;
+      color: #999;
+      width: auto;
+      max-width: 100%;
+    }
+    .collection-select:focus { border-color: #4ade80; color: #e0e0e0; }
+
+    /* --- Multi-select / bulk delete --- */
+    .list-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .toolbar-btn {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #ccc;
+      padding: 7px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: 6px;
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+    }
+    .toolbar-btn:hover { border-color: #4ade80; color: #4ade80; }
+    .toolbar-btn.active {
+      background: #4ade80;
+      color: #0a0a0a;
+      border-color: #4ade80;
+    }
+    .toolbar-btn.danger {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: #fff;
+    }
+    .toolbar-btn.danger:hover { background: #dc2626; color: #fff; }
+    .toolbar-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .toolbar-count {
+      color: #aaa;
+      font-size: 0.82rem;
+      margin-left: auto;
+    }
+    .select-box {
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      margin: 0 0 0 2px;
+      align-self: center;
+      accent-color: #4ade80;
+      cursor: pointer;
+    }
+    body:not(.select-mode) .select-box { display: none; }
+    body.select-mode .item-list li { cursor: default; }
+    .item-list li.selected {
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 0 1px #ef4444 inset;
+    }
     .parent-select {
       margin-top: 8px;
       padding: 5px 8px;
@@ -620,6 +713,11 @@
 
         <div id="importOwnedExtras" class="hidden">
           <div class="form-group">
+            <label for="importCollection">Type / Collection (optional)</label>
+            <input type="text" id="importCollection" list="collectionOptionsImport" placeholder="e.g. Consumables, Safety, Pistols" />
+            <datalist id="collectionOptionsImport"></datalist>
+          </div>
+          <div class="form-group">
             <label for="importQuantity">Quantity</label>
             <input type="number" id="importQuantity" min="0" step="1" value="1" />
           </div>
@@ -679,6 +777,11 @@
             </select>
           </div>
           <div class="form-group">
+            <label for="gearCollection">Type / Collection (optional)</label>
+            <input type="text" id="gearCollection" list="collectionOptions" placeholder="e.g. Consumables, Safety, Pistols" />
+            <datalist id="collectionOptions"></datalist>
+          </div>
+          <div class="form-group">
             <label for="gearQuantity">Quantity</label>
             <input type="number" id="gearQuantity" min="0" step="1" value="1" />
           </div>
@@ -704,6 +807,12 @@
         </div>
 
         <h2>📦 Your Gear <span id="gearSummary"></span></h2>
+        <div class="list-toolbar">
+          <button class="toolbar-btn" id="selectModeBtn">☑︎ Select</button>
+          <button class="toolbar-btn hidden" id="selectAllBtn">Select all</button>
+          <button class="toolbar-btn danger hidden" id="bulkDeleteBtn" disabled>Delete</button>
+          <span class="toolbar-count hidden" id="selectCount">0 selected</span>
+        </div>
         <div id="gearListContainer" class="card">
           <ul id="gearList" class="item-list">
             <li style="color:#aaa;">Loading...</li>
@@ -869,6 +978,12 @@
       if (Array.isArray(stored)) expandedGroups = new Set(stored);
     } catch (_) { /* storage unavailable or corrupt: start collapsed */ }
 
+    // Multi-select state for bulk delete
+    let selectMode = false;
+    let selectedIds = new Set();
+
+    const UNTYPED = "__untyped__";
+
     function persistExpandedGroups() {
       try {
         localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expandedGroups]));
@@ -959,6 +1074,26 @@
         console.error("Delete error:", err);
         throw err;
       }
+    }
+
+    // Delete several rows in one request. PostgREST's in.() filter beats
+    // firing N separate DELETEs and half-failing.
+    async function deleteItems(table, ids) {
+      if (!ids.length) return true;
+      const list = ids.map(id => `"${id}"`).join(",");
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=in.(${list})`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "apikey": SUPABASE_ANON_KEY,
+        },
+      });
+      if (!response.ok) {
+        let message = "Bulk delete failed";
+        try { message = (await response.json()).message || message; } catch (_) {}
+        throw new Error(message);
+      }
+      return true;
     }
 
     // Update (PATCH) an item in Supabase
@@ -1188,6 +1323,7 @@
             category,
             brand: brand || null,
             notes: notes || null,
+            collection: document.getElementById("importCollection").value.trim() || null,
             quantity: normalizeQuantity(document.getElementById("importQuantity").value),
             parent_id: document.getElementById("importParent").value || null,
           };
@@ -1257,6 +1393,121 @@
       }
     }
 
+    // Fill both add-form datalists with the collection names in use.
+    function populateCollectionOptions(names) {
+      const html = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join("");
+      ["collectionOptions", "collectionOptionsImport"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+      });
+    }
+
+    // Move an item into a different type section.
+    async function changeCollection(id, value, selectEl) {
+      let next = value;
+      if (value === "__new__") {
+        next = (prompt("New type name (e.g. Consumables, Safety, Pistols):") || "").trim();
+        if (!next) { loadGearItems(); return; }
+      }
+      try {
+        await updateItem("gear_items", id, { collection: next || null });
+        showSuccess(next ? `✅ Moved to ${next}` : "✅ Type cleared");
+        await loadGearItems();
+      } catch (err) {
+        showError("Could not change type: " + err.message);
+        loadGearItems();
+      }
+    }
+
+    // --- Multi-select ---------------------------------------------------
+
+    function updateSelectionUi() {
+      const countEl = document.getElementById("selectCount");
+      const delBtn = document.getElementById("bulkDeleteBtn");
+      if (countEl) countEl.textContent = `${selectedIds.size} selected`;
+      if (delBtn) delBtn.disabled = selectedIds.size === 0;
+    }
+
+    function setSelectMode(on) {
+      selectMode = on;
+      document.body.classList.toggle("select-mode", on);
+      if (!on) selectedIds.clear();
+
+      const btn = document.getElementById("selectModeBtn");
+      if (btn) {
+        btn.classList.toggle("active", on);
+        btn.textContent = on ? "✕ Done" : "☑︎ Select";
+      }
+      ["selectAllBtn", "bulkDeleteBtn", "selectCount"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle("hidden", !on);
+      });
+
+      document.querySelectorAll("#gearList .select-box").forEach(box => {
+        box.checked = selectedIds.has(box.dataset.id);
+      });
+      document.querySelectorAll("#gearList li").forEach(li => {
+        const box = li.querySelector(".select-box");
+        li.classList.toggle("selected", !!box && selectedIds.has(box.dataset.id));
+      });
+      updateSelectionUi();
+    }
+
+    // Delete every selected row in one request.
+    async function bulkDeleteSelected() {
+      const ids = [...selectedIds];
+      if (!ids.length) return;
+
+      // Warn about accessories that would be left behind rather than deleted.
+      const selected = new Set(ids);
+      const orphaned = gearCache.filter(
+        i => i.parent_id && selected.has(i.parent_id) && !selected.has(i.id)
+      ).length;
+
+      let message = `Delete ${ids.length} item${ids.length !== 1 ? 's' : ''}?`;
+      if (orphaned > 0) {
+        message += `\n\n${orphaned} attached item${orphaned !== 1 ? 's' : ''} will be kept, but will become standalone.`;
+      }
+      if (!confirm(message)) return;
+
+      const btn = document.getElementById("bulkDeleteBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Deleting..."; }
+
+      try {
+        await deleteItems("gear_items", ids);
+        selectedIds.clear();
+        showSuccess(`✅ Deleted ${ids.length} item${ids.length !== 1 ? 's' : ''}`);
+        setSelectMode(false);
+        await loadGearItems();
+      } catch (err) {
+        showError("Bulk delete failed: " + err.message);
+        await loadGearItems();
+      } finally {
+        if (btn) btn.textContent = "Delete";
+        updateSelectionUi();
+      }
+    }
+
+    function initGearToolbar() {
+      const selectBtn = document.getElementById("selectModeBtn");
+      if (selectBtn) {
+        selectBtn.addEventListener("click", () => setSelectMode(!selectMode));
+      }
+      const allBtn = document.getElementById("selectAllBtn");
+      if (allBtn) {
+        allBtn.addEventListener("click", () => {
+          // "All" means every row currently rendered, collapsed children included.
+          const allSelected = gearCache.length > 0 && selectedIds.size === gearCache.length;
+          selectedIds = allSelected ? new Set() : new Set(gearCache.map(i => i.id));
+          allBtn.textContent = allSelected ? "Select all" : "Select none";
+          setSelectMode(true);
+        });
+      }
+      const delBtn = document.getElementById("bulkDeleteBtn");
+      if (delBtn) delBtn.addEventListener("click", bulkDeleteSelected);
+      updateSelectionUi();
+    }
+
     // Fill the "Part of" dropdowns on the add forms with current top-level items.
     function populateParentPickers() {
       const candidates = gearCache.filter(i => !i.parent_id);
@@ -1289,7 +1540,7 @@
     // One gear card. `isChild` indents it under its parent; `childCount` > 0
     // means it is a parent device and cannot itself be nested.
     // `group` carries the collapse state and rolled-up totals for a parent.
-    function renderGearCard(item, isChild, childCount, parentCandidates, group) {
+    function renderGearCard(item, isChild, childCount, parentCandidates, group, collectionNames) {
       const qty = normalizeQuantity(item.quantity);
       const unit = normalizePrice(item.price);
       const lineTotal = unit !== null ? unit * qty : null;
@@ -1298,6 +1549,7 @@
       if (isChild) classes.push("gear-child");
       if (qty === 0) classes.push("out-of-stock");
       if (isChild && group && !group.expanded) classes.push("collapsed");
+      if (selectedIds.has(item.id)) classes.push("selected");
 
       const image = item.source_image_url
         ? `<img src="${item.source_image_url}" alt="Item image" class="item-image" onerror="this.style.display='none'" />`
@@ -1315,9 +1567,24 @@
             </select>`;
       }
 
+      // Collection lives on top-level items only. Children are shown inside
+      // their parent's section, so giving them their own picker would let the
+      // list claim an accessory is in a section it isn't rendered in.
+      let collectionPicker = "";
+      if (!isChild) {
+        const opts = collectionNames
+          .map(c => `<option value="${escapeHtml(c)}"${c === item.collection ? " selected" : ""}>${escapeHtml(c)}</option>`)
+          .join("");
+        collectionPicker = `<select class="collection-select" data-id="${item.id}">
+              <option value=""${!item.collection ? " selected" : ""}>— no type —</option>${opts}
+              <option value="__new__">+ new type…</option>
+            </select>`;
+      }
+
       return `
         <li data-url="${item.source_url || ''}"${isChild && group ? ` data-parent="${group.parentId}"` : ''}${classes.length ? ` class="${classes.join(' ')}"` : ''}>
           <div class="item-image-wrapper">
+            <input type="checkbox" class="select-box" data-id="${item.id}"${selectedIds.has(item.id) ? ' checked' : ''} />
             ${image}
             <div class="item-content">
               <div class="item-name">${escapeHtml(item.name)}</div>
@@ -1333,7 +1600,7 @@
                 ${qty > 1 && unit !== null ? `<span class="qty-unit">€${unit.toFixed(2)} each</span>` : ''}
                 ${qty === 0 ? '<span class="out-badge">out</span>' : ''}
               </div>
-              ${parentPicker}
+              <div>${collectionPicker}${parentPicker}</div>
             </div>
             ${lineTotal !== null ? `<div class="item-price">€${lineTotal.toFixed(2)}</div>` : ''}
           </div>
@@ -1380,18 +1647,68 @@
       const topLevel = items.filter(i => !i.parent_id || !byId.has(i.parent_id));
       const parentCandidates = items.filter(i => !i.parent_id);
 
-      const html = [];
+      // Distinct collection names, for the per-card pickers and the datalists
+      const collectionNames = [...new Set(
+        items.map(i => (i.collection || "").trim()).filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b));
+      populateCollectionOptions(collectionNames);
+
+      // Top-level items are bucketed by collection; children always render
+      // with their parent, so they inherit its section.
+      const sections = new Map();
       topLevel.forEach(parent => {
-        const children = childrenOf.get(parent.id) || [];
-        const group = children.length
-          ? { parentId: parent.id, expanded: expandedGroups.has(parent.id), ...groupTotals(parent, children) }
-          : null;
-        html.push(renderGearCard(parent, false, children.length, parentCandidates, group));
-        children.forEach(child => {
-          html.push(renderGearCard(child, true, (childrenOf.get(child.id) || []).length, parentCandidates, group));
+        const key = (parent.collection || "").trim() || UNTYPED;
+        if (!sections.has(key)) sections.set(key, []);
+        sections.get(key).push(parent);
+      });
+
+      // Named sections alphabetically, untyped last
+      const sectionKeys = [...sections.keys()]
+        .filter(k => k !== UNTYPED)
+        .sort((a, b) => a.localeCompare(b));
+      if (sections.has(UNTYPED)) sectionKeys.push(UNTYPED);
+
+      const html = [];
+      sectionKeys.forEach(key => {
+        const parents = sections.get(key);
+
+        // Section stats count parents and everything nested under them
+        let sectionUnits = 0;
+        let sectionValue = 0;
+        let sectionEntries = 0;
+        parents.forEach(parent => {
+          const kids = childrenOf.get(parent.id) || [];
+          const t = groupTotals(parent, kids);
+          sectionUnits += t.units;
+          sectionValue += t.value;
+          sectionEntries += 1 + kids.length;
+        });
+
+        html.push(`
+          <div class="section-head">
+            <span class="section-title${key === UNTYPED ? ' untyped' : ''}">${key === UNTYPED ? 'No type' : escapeHtml(key)}</span>
+            <span class="section-stats">${sectionEntries} item${sectionEntries !== 1 ? 's' : ''} · ${sectionUnits} unit${sectionUnits !== 1 ? 's' : ''} · <strong>€${sectionValue.toFixed(2)}</strong></span>
+          </div>
+        `);
+
+        parents.forEach(parent => {
+          const children = childrenOf.get(parent.id) || [];
+          const group = children.length
+            ? { parentId: parent.id, expanded: expandedGroups.has(parent.id), ...groupTotals(parent, children) }
+            : null;
+          html.push(renderGearCard(parent, false, children.length, parentCandidates, group, collectionNames));
+          children.forEach(child => {
+            html.push(renderGearCard(child, true, (childrenOf.get(child.id) || []).length, parentCandidates, group, collectionNames));
+          });
         });
       });
       list.innerHTML = html.join("");
+
+      // Drop selections for rows that no longer exist
+      const liveIds = new Set(items.map(i => i.id));
+      [...selectedIds].forEach(id => { if (!liveIds.has(id)) selectedIds.delete(id); });
+      document.body.classList.toggle("select-mode", selectMode);
+      updateSelectionUi();
 
       // Drop collapse state for groups that no longer exist
       const liveParents = new Set(topLevel.filter(p => (childrenOf.get(p.id) || []).length).map(p => p.id));
@@ -1422,8 +1739,34 @@
       document.querySelectorAll('#gearList li').forEach(li => {
         li.addEventListener('click', (e) => {
           if (e.target.closest('button, select, input, option')) return;
+          if (selectMode) {
+            const box = li.querySelector('.select-box');
+            if (box) { box.checked = !box.checked; box.dispatchEvent(new Event('change', { bubbles: true })); }
+            return;
+          }
           const url = li.dataset.url;
           if (url) window.open(url, '_blank');
+        });
+      });
+
+      // Checkboxes
+      document.querySelectorAll('#gearList .select-box').forEach(box => {
+        box.addEventListener('click', (e) => e.stopPropagation());
+        box.addEventListener('change', () => {
+          if (box.checked) selectedIds.add(box.dataset.id);
+          else selectedIds.delete(box.dataset.id);
+          const li = box.closest('li');
+          if (li) li.classList.toggle('selected', box.checked);
+          updateSelectionUi();
+        });
+      });
+
+      // Collection pickers
+      document.querySelectorAll('#gearList .collection-select').forEach(sel => {
+        sel.addEventListener('click', (e) => e.stopPropagation());
+        sel.addEventListener('change', (e) => {
+          e.stopPropagation();
+          changeCollection(sel.dataset.id, sel.value, sel);
         });
       });
 
@@ -1643,6 +1986,7 @@
           category: document.getElementById("gearCategory").value,
           brand: document.getElementById("gearBrand").value.trim() || null,
           notes: document.getElementById("gearNotes").value.trim() || null,
+          collection: document.getElementById("gearCollection").value.trim() || null,
           quantity: normalizeQuantity(document.getElementById("gearQuantity").value),
           parent_id: document.getElementById("gearParent").value || null,
           price: normalizePrice(document.getElementById("gearPrice").value),
@@ -1655,6 +1999,7 @@
           document.getElementById("gearNotes").value = "";
           document.getElementById("gearPrice").value = "";
           document.getElementById("gearQuantity").value = "1";
+          document.getElementById("gearCollection").value = "";
           document.getElementById("gearParent").value = "";
           loadGearItems();
         } catch (err) {
@@ -1786,6 +2131,7 @@
       }
 
       loadEvents();
+      initGearToolbar();
     }
 
     // Initialize app
